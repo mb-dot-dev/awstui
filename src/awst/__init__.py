@@ -1,5 +1,6 @@
-from awst.skeleton_app import SkeletonApp
+from awst.app import AwstApp
 
 
 def main() -> None:
-    SkeletonApp().run()
+    """Run the awst terminal UI."""
+    AwstApp().run()
