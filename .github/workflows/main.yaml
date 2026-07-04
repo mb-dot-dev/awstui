@@ -16,11 +16,11 @@ jobs:
     name: SonarQube
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
       
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
 
@@ -34,7 +34,7 @@ jobs:
         run: make coverage
       
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v8
+        uses: SonarSource/sonarqube-scan-action@713881670b6b3676cda39549040e2d88c70d582e # v8.2.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
