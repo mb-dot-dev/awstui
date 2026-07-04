@@ -195,3 +195,26 @@ async def test_cursor_stays_on_same_stack_after_refresh() -> None:
         table = app.screen.query_one(DataTable)
 
         assert table.get_row_at(table.cursor_row)[0] == "beta"
+
+
+@pytest.mark.asyncio
+async def test_refresh_does_not_steal_focus_from_filter() -> None:
+    gateway = FakeCloudFormationGateway(stacks=[_stack("alpha")])
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        filter_input = app.screen.query_one("#filter", Input)
+        filter_input.focus()
+        await pilot.pause()
+        assert filter_input.has_focus
+
+        screen = app.screen
+        assert isinstance(screen, StackListScreen)
+        screen.action_refresh()
+        await _settle(app)
+        await pilot.pause()
+
+        assert filter_input.has_focus

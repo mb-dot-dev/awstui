@@ -119,7 +119,7 @@ class StackListScreen(Screen[None]):
         self.query_one("#filter", Input).focus()
 
     def action_refresh(self: Self) -> None:
-        if self._all_stacks:
+        if self._loaded:
             self.query_one("#count", Static).update("refreshing…")
         else:
             self.query_one("#stacks", DataTable).loading = True
