@@ -65,7 +65,8 @@ src/awst/
 - Extension path: each future service adds one gateway module + one screen module +
   a home-menu entry; existing files change only at the menu list.
 
-**New dependencies:** `boto3` (runtime); `boto3-stubs[cloudformation]` (dev, for `ty`).
+**New dependencies:** `boto3` (runtime); `boto3-stubs[cloudformation]` (dev, for
+`ty`) and `moto` (dev, for gateway tests).
 
 ## Screens
 
@@ -158,11 +159,17 @@ Cases:
 - Initial-load failure shows the error panel; `r` retries and recovers.
 - Refresh failure keeps stale rows and shows a toast.
 
-**Gateway tests** (`botocore.stub.Stubber`, no network):
+**Gateway tests** (`moto`'s `mock_aws`, no network). Stacks are created through
+moto's mocked CloudFormation backend, then `list_stacks()` is asserted against
+them — exercising the real boto3 request/response path:
 
-- Pagination: two stubbed pages → one combined list.
+- Multiple stacks created in moto → one combined, name-mappable list. (moto
+  doesn't expose page boundaries, so boto3's paginator mechanics are trusted
+  as SDK behavior rather than forced across pages.)
 - Field mapping, including absent `LastUpdatedTime` → falls back to `CreationTime`.
-- Exception mapping: stubbed botocore errors → `AwsError` with expected hints.
+- Exception mapping: `ClientError` cases via moto where producible; credential
+  and connection errors (`NoCredentialsError`, `EndpointConnectionError`) by
+  constructing the botocore exceptions directly against the mapping function.
 
 Coverage must clear the existing 75% gate; `make test` (lint + unit) remains the
 definition of done.
