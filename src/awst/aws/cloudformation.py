@@ -2,6 +2,9 @@
 
 from typing import TYPE_CHECKING, Self
 
+from botocore.exceptions import BotoCoreError, ClientError
+
+from awst.aws.errors import map_botocore_error
 from awst.aws.models import StackSummary
 
 if TYPE_CHECKING:
@@ -16,9 +19,15 @@ class CloudFormationGateway:
         self._client = client
 
     def list_stacks(self: Self) -> list[StackSummary]:
-        """Return every stack in the account/region, sorted by name."""
-        paginator = self._client.get_paginator("describe_stacks")
-        stacks = [_to_summary(stack) for page in paginator.paginate() for stack in page["Stacks"]]
+        """Return every stack in the account/region, sorted by name.
+
+        Raises AwsError for any credential, network, or API failure.
+        """
+        try:
+            paginator = self._client.get_paginator("describe_stacks")
+            stacks = [_to_summary(stack) for page in paginator.paginate() for stack in page["Stacks"]]
+        except (BotoCoreError, ClientError) as error:
+            raise map_botocore_error(error) from error
         return sorted(stacks, key=lambda stack: stack.name)
 
 
