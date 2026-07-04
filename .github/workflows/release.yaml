@@ -1,0 +1,24 @@
+name: Publish
+run-name: Publish Package
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          uv version "$VERSION"
+
+      - name: Build package
+        run: |
+          uv build
