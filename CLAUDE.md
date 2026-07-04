@@ -20,7 +20,7 @@ All commands run through `uv` and are wrapped by the `Makefile`; prefer the `mak
 
 Run a single test directly with uv/pytest, e.g.:
 ```
-uv run --frozen pytest tests/test_skeleton_app.py::test_happy_path
+uv run --frozen pytest tests/test_app.py::test_q_quits_from_home
 ```
 
 There is no separate typecheck-only Makefile target; `ty check` is invoked as part of `make lint`.
