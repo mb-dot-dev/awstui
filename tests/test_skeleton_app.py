@@ -1,7 +1,7 @@
 import pytest
 from textual.widgets import Label
 
-from awstui.skeleton_app import SkeletonApp
+from awst.skeleton_app import SkeletonApp
 
 
 @pytest.mark.asyncio

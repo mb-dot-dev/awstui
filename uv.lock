@@ -104,7 +104,7 @@ wheels = [
 ]
 
 [[package]]
-name = "awstui"
+name = "awst"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

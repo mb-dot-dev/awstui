@@ -1,4 +1,4 @@
-from awstui.skeleton_app import SkeletonApp
+from awst.skeleton_app import SkeletonApp
 
 
 def main() -> None:
