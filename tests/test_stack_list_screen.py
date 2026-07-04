@@ -6,7 +6,7 @@ from typing import Self
 import pytest
 from rich.text import Text
 from textual.app import App
-from textual.widgets import DataTable, Static
+from textual.widgets import DataTable, Input, Static
 
 from awst.aws.models import StackSummary
 from awst.screens.stacks import StackListScreen
@@ -89,6 +89,68 @@ async def test_escape_pops_back() -> None:
         await _settle(app)
         await pilot.pause()
         assert isinstance(app.screen, StackListScreen)
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert not isinstance(app.screen, StackListScreen)
+
+
+@pytest.mark.asyncio
+async def test_filter_narrows_rows_live() -> None:
+    gateway = FakeCloudFormationGateway(
+        stacks=[_stack("prod-api"), _stack("prod-network"), _stack("staging-api")],
+    )
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("slash")
+        await pilot.press(*"prod")
+        await pilot.pause()
+        table = app.screen.query_one(DataTable)
+
+        assert table.row_count == 2
+        assert "2 of 3 stacks" in str(app.screen.query_one("#count", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_filter_is_case_insensitive() -> None:
+    gateway = FakeCloudFormationGateway(stacks=[_stack("Prod-API"), _stack("staging")])
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("slash")
+        await pilot.press(*"prod")
+        await pilot.pause()
+
+        assert app.screen.query_one(DataTable).row_count == 1
+
+
+@pytest.mark.asyncio
+async def test_escape_clears_filter_before_going_back() -> None:
+    gateway = FakeCloudFormationGateway(stacks=[_stack("prod-api"), _stack("staging-api")])
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+        await pilot.press("slash")
+        await pilot.press(*"prod")
+        await pilot.pause()
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert isinstance(app.screen, StackListScreen)  # still here: escape only cleared the filter
+        assert app.screen.query_one("#filter", Input).value == ""
+        assert app.screen.query_one(DataTable).row_count == 2
+        assert app.screen.query_one(DataTable).has_focus
 
         await pilot.press("escape")
         await pilot.pause()

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, ClassVar, Protocol, Self
 from rich.text import Text
 from textual import work
 from textual.screen import Screen
-from textual.widgets import DataTable, Footer, Static
+from textual.widgets import DataTable, Footer, Input, Static
 from textual.worker import WorkerState
 
 from awst.screens.formatting import relative_age, status_style
@@ -34,7 +34,10 @@ class StackListScreen(Screen[None]):
 
     TITLE = "CloudFormation stacks"
 
-    BINDINGS: ClassVar[list[BindingType]] = [("escape", "back", "Back")]
+    BINDINGS: ClassVar[list[BindingType]] = [
+        ("escape", "back_or_clear", "Back"),
+        ("slash", "focus_filter", "Filter"),
+    ]
 
     DEFAULT_CSS = """
     #count { height: 1; padding: 0 1; color: $text-muted; }
@@ -47,6 +50,7 @@ class StackListScreen(Screen[None]):
 
     def compose(self: Self) -> ComposeResult:
         yield Static(id="count")
+        yield Input(placeholder="filter stacks by name", id="filter")
         yield DataTable(id="stacks")
         yield Footer()
 
@@ -67,16 +71,20 @@ class StackListScreen(Screen[None]):
             return
         if event.state == WorkerState.SUCCESS:
             self._all_stacks = event.worker.result or []
-            self.query_one("#stacks", DataTable).loading = False
+            table = self.query_one("#stacks", DataTable)
+            table.loading = False
             self._render_rows()
+            table.focus()
         elif event.state == WorkerState.ERROR and event.worker.error is not None:
             raise event.worker.error
 
     def _render_rows(self: Self) -> None:
         table = self.query_one("#stacks", DataTable)
+        query = self.query_one("#filter", Input).value.strip().lower()
+        visible = [stack for stack in self._all_stacks if query in stack.name.lower()]
         table.clear()
         now = datetime.now(tz=UTC)
-        for stack in self._all_stacks:
+        for stack in visible:
             table.add_row(
                 stack.name,
                 Text(stack.status, style=status_style(stack.status)),
@@ -84,7 +92,21 @@ class StackListScreen(Screen[None]):
                 relative_age(stack.updated, now),
                 key=stack.name,
             )
-        self.query_one("#count", Static).update(f"{len(self._all_stacks)} stacks")
+        total = len(self._all_stacks)
+        count = f"{len(visible)} of {total} stacks" if query else f"{total} stacks"
+        self.query_one("#count", Static).update(count)
 
-    def action_back(self: Self) -> None:
-        self.app.pop_screen()
+    def on_input_changed(self: Self, event: Input.Changed) -> None:
+        if event.input.id == "filter":
+            self._render_rows()
+
+    def action_focus_filter(self: Self) -> None:
+        self.query_one("#filter", Input).focus()
+
+    def action_back_or_clear(self: Self) -> None:
+        filter_input = self.query_one("#filter", Input)
+        if filter_input.has_focus or filter_input.value:
+            filter_input.value = ""
+            self.query_one("#stacks", DataTable).focus()
+        else:
+            self.app.pop_screen()
