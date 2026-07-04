@@ -40,4 +40,5 @@ jobs:
         with:
           args: >
             -Dsonar.qualitygate.wait=true
+            -Dsonar.python.version=3.14
   
