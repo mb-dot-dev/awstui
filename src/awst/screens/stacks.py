@@ -125,7 +125,8 @@ class StackListScreen(Screen[None]):
         if previous in names:
             table.move_cursor(row=names.index(previous))
         total = len(self._all_stacks)
-        count = f"{len(visible)} of {total} stacks" if query else f"{total} stacks"
+        noun = "stack" if total == 1 else "stacks"
+        count = f"{len(visible)} of {total} {noun}" if query else f"{total} {noun}"
         self.query_one("#count", Static).update(count)
 
     def _cursor_stack_name(self: Self, table: DataTable) -> str | None:

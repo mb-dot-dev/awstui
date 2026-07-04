@@ -35,7 +35,7 @@ async def _settle(app: App[None]) -> None:
 
 
 @pytest.mark.asyncio
-async def test_renders_one_row_per_stack_sorted_input_preserved() -> None:
+async def test_renders_one_row_per_stack_in_gateway_order() -> None:
     gateway = FakeCloudFormationGateway(stacks=[_stack("prod-api"), _stack("prod-network")])
     app = StackScreenApp(gateway)
 
@@ -72,6 +72,18 @@ async def test_count_header_shows_total() -> None:
         await pilot.pause()
 
         assert "3 stacks" in str(app.screen.query_one("#count", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_count_header_uses_singular_for_one_stack() -> None:
+    gateway = FakeCloudFormationGateway(stacks=[_stack("alpha")])
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        assert str(app.screen.query_one("#count", Static).content) == "1 stack"
 
 
 @pytest.mark.asyncio
@@ -309,7 +321,7 @@ async def test_refresh_failure_keeps_stale_rows_and_notifies(monkeypatch: pytest
         assert table.display is True
         assert table.row_count == 1  # stale rows kept
         assert toasts == ["throttled"]
-        assert "1 stacks" in str(app.screen.query_one("#count", Static).content)  # "refreshing…" cleared
+        assert str(app.screen.query_one("#count", Static).content) == "1 stack"  # "refreshing…" cleared
 
 
 @pytest.mark.asyncio
