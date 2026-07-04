@@ -11,6 +11,7 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Input, Static
 from textual.worker import WorkerState
 
+from awst.aws.models import AwsError
 from awst.screens.formatting import relative_age, status_style
 
 if TYPE_CHECKING:
@@ -42,6 +43,7 @@ class StackListScreen(Screen[None]):
 
     DEFAULT_CSS = """
     #count { height: 1; padding: 0 1; color: $text-muted; }
+    #error { display: none; padding: 1 2; color: $text-error; }
     """
 
     def __init__(self: Self, gateway: StackLister) -> None:
@@ -54,6 +56,7 @@ class StackListScreen(Screen[None]):
         yield Static(id="count")
         yield Input(placeholder="filter stacks by name", id="filter")
         yield DataTable(id="stacks")
+        yield Static(id="error")
         yield Footer()
 
     def on_mount(self: Self) -> None:
@@ -80,8 +83,25 @@ class StackListScreen(Screen[None]):
             self._render_rows()
             if not was_loaded:
                 table.focus()
-        elif event.state == WorkerState.ERROR and event.worker.error is not None:
-            raise event.worker.error
+        elif event.state == WorkerState.ERROR:
+            error = event.worker.error
+            if isinstance(error, AwsError):
+                self._show_error(error)
+            elif error is not None:
+                raise error
+
+    def _show_error(self: Self, error: AwsError) -> None:
+        if self._loaded:
+            self.notify(error.message, title="Refresh failed", severity="error")
+            self._render_rows()  # restores the count text over "refreshing…"
+            return
+        table = self.query_one("#stacks", DataTable)
+        table.loading = False
+        table.display = False
+        self.set_focus(None)
+        panel = self.query_one("#error", Static)
+        panel.update(error.message if error.hint is None else f"{error.message}\n{error.hint}")
+        panel.display = True
 
     def _render_rows(self: Self) -> None:
         table = self.query_one("#stacks", DataTable)
@@ -119,10 +139,13 @@ class StackListScreen(Screen[None]):
         self.query_one("#filter", Input).focus()
 
     def action_refresh(self: Self) -> None:
+        self.query_one("#error", Static).display = False
+        table = self.query_one("#stacks", DataTable)
+        table.display = True
         if self._loaded:
             self.query_one("#count", Static).update("refreshing…")
         else:
-            self.query_one("#stacks", DataTable).loading = True
+            table.loading = True
         self._fetch_stacks()
 
     def action_back_or_clear(self: Self) -> None:

@@ -8,7 +8,7 @@ from rich.text import Text
 from textual.app import App
 from textual.widgets import DataTable, Input, Static
 
-from awst.aws.models import StackSummary
+from awst.aws.models import AwsError, StackSummary
 from awst.screens.stacks import StackListScreen
 from tests.fakes import FakeCloudFormationGateway
 
@@ -218,3 +218,66 @@ async def test_refresh_does_not_steal_focus_from_filter() -> None:
         await pilot.pause()
 
         assert filter_input.has_focus
+
+
+@pytest.mark.asyncio
+async def test_initial_load_failure_shows_error_panel() -> None:
+    gateway = FakeCloudFormationGateway(error=AwsError("no credentials", hint="run `aws sso login`"))
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+        panel = app.screen.query_one("#error", Static)
+
+        assert panel.display is True
+        assert "no credentials" in str(panel.content)
+        assert "aws sso login" in str(panel.content)
+        assert app.screen.query_one(DataTable).display is False
+
+
+@pytest.mark.asyncio
+async def test_retry_after_initial_failure_recovers() -> None:
+    gateway = FakeCloudFormationGateway(error=AwsError("boom"))
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        gateway.error = None
+        gateway.stacks = [_stack("alpha")]
+        await pilot.press("r")
+        await _settle(app)
+        await pilot.pause()
+
+        assert app.screen.query_one("#error", Static).display is False
+        assert app.screen.query_one(DataTable).display is True
+        assert app.screen.query_one(DataTable).row_count == 1
+
+
+@pytest.mark.asyncio
+async def test_refresh_failure_keeps_stale_rows_and_notifies(monkeypatch: pytest.MonkeyPatch) -> None:
+    toasts: list[str] = []
+
+    def record_notify(self: App[None], message: str, **kwargs: object) -> None:
+        toasts.append(message)
+
+    monkeypatch.setattr(App, "notify", record_notify)
+    gateway = FakeCloudFormationGateway(stacks=[_stack("alpha")])
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        gateway.error = AwsError("throttled")
+        await pilot.press("r")
+        await _settle(app)
+        await pilot.pause()
+        table = app.screen.query_one(DataTable)
+
+        assert table.display is True
+        assert table.row_count == 1  # stale rows kept
+        assert toasts == ["throttled"]
+        assert "1 stacks" in str(app.screen.query_one("#count", Static).content)  # "refreshing…" cleared
