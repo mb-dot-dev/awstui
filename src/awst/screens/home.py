@@ -9,6 +9,7 @@ from textual.screen import Screen
 from textual.widgets import Footer, OptionList, Static
 from textual.widgets.option_list import Option
 
+from awst.screens.buckets import BucketListScreen
 from awst.screens.stacks import StackListScreen
 
 if TYPE_CHECKING:
@@ -39,7 +40,13 @@ SERVICES = (
         enabled=True,
         screen_factory=lambda app: StackListScreen(app.cloudformation_gateway),
     ),
-    ServiceEntry(option_id="s3", name="S3", resource="Buckets", enabled=False, screen_factory=None),
+    ServiceEntry(
+        option_id="s3",
+        name="S3",
+        resource="Buckets",
+        enabled=True,
+        screen_factory=lambda app: BucketListScreen(app.s3_gateway),
+    ),
     ServiceEntry(option_id="sqs", name="SQS", resource="Queues", enabled=False, screen_factory=None),
 )
 
