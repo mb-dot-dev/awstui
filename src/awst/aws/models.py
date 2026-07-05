@@ -23,6 +23,15 @@ class StackNotFoundError(AwsError):
 
 
 @dataclass(frozen=True, slots=True)
+class BucketSummary:
+    """An S3 bucket, reduced to what the UI needs."""
+
+    name: str
+    region: str
+    created: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class StackSummary:
     """A CloudFormation stack, reduced to what the UI needs."""
 
