@@ -77,7 +77,8 @@ no longer exists and pops back to the stack list.
 
 ## Delete flow
 
-- `d` pushes `ConfirmDeleteScreen(ModalScreen[bool])`, showing the stack name
+- `d` pushes `ConfirmScreen(ModalScreen[bool])` (a reusable yes/no modal in
+  `src/awst/screens/confirm.py`), showing the stack name
   with Delete/Cancel buttons; `y` confirms, `n` or `escape` cancels.
 - On confirm, a second thread worker calls `gateway.delete_stack(name)`.
   - Success → `notify("Delete requested — press r to check progress")` and the
