@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Self
 
 from awst.aws.models import (
+    BucketSummary,
     StackDetail,
     StackEvent,
     StackNotFoundError,
@@ -109,3 +110,23 @@ class FakeCloudFormationGateway:
         if self.delete_error is not None:
             raise self.delete_error
         self.deleted.append(name)
+
+
+def make_bucket(name: str, region: str = "eu-west-1") -> BucketSummary:
+    """A bucket summary with sensible defaults for list-screen tests."""
+    return BucketSummary(name=name, region=region, created=_CREATED)
+
+
+class FakeS3Gateway:
+    """In-memory stand-in for the real S3 gateway."""
+
+    def __init__(self: Self, buckets: list[BucketSummary] | None = None, error: AwsError | None = None) -> None:
+        self.buckets = buckets or []
+        self.error = error
+        self.calls = 0
+
+    def list_buckets(self: Self) -> list[BucketSummary]:
+        self.calls += 1
+        if self.error is not None:
+            raise self.error
+        return list(self.buckets)
