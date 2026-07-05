@@ -95,6 +95,8 @@ class StackDetailScreen(Screen[None]):
     def on_worker_state_changed(self: Self, event: Worker.StateChanged) -> None:
         if event.worker.name == "_fetch_detail":
             self._handle_fetch(event)
+        elif event.worker.name == "_request_delete":
+            self._handle_delete(event)
 
     def _handle_fetch(self: Self, event: Worker.StateChanged) -> None:
         if event.state == WorkerState.SUCCESS:
@@ -191,6 +193,17 @@ class StackDetailScreen(Screen[None]):
     @work(thread=True, exclusive=True, group="delete", exit_on_error=False)
     def _request_delete(self: Self) -> None:
         self._gateway.delete_stack(self._stack_name)
+
+    def _handle_delete(self: Self, event: Worker.StateChanged) -> None:
+        if event.state == WorkerState.SUCCESS:
+            self.notify("Delete requested — press r to check progress.", title=self._stack_name)
+        elif event.state == WorkerState.ERROR:
+            error = event.worker.error
+            if isinstance(error, AwsError):
+                message = error.message if error.hint is None else f"{error.message} ({error.hint})"
+                self.notify(message, title="Delete failed", severity="error")
+            elif error is not None:
+                raise error
 
 
 def _overview_text(detail: StackDetail, now: datetime) -> Text:

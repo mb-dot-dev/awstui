@@ -12,10 +12,12 @@ from awst.aws.models import (
     AwsError,
     StackDetail,
     StackEvent,
+    StackNotFoundError,
     StackOutput,
     StackParameter,
     StackResource,
 )
+from awst.screens.confirm import ConfirmScreen
 from awst.screens.stack_detail import StackDetailScreen
 from tests.fakes import FakeCloudFormationGateway
 
@@ -217,3 +219,113 @@ async def test_escape_pops_back() -> None:
         await pilot.pause()
 
         assert not isinstance(app.screen, StackDetailScreen)
+
+
+@pytest.mark.asyncio
+async def test_d_opens_confirmation_modal_naming_the_stack() -> None:
+    app = DetailScreenApp(FakeCloudFormationGateway(detail=_detail()))
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("d")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ConfirmScreen)
+        assert "alpha" in str(app.screen.query_one("#question", Static).content)
+
+
+@pytest.mark.asyncio
+async def test_confirming_delete_calls_gateway_and_notifies(monkeypatch: pytest.MonkeyPatch) -> None:
+    toasts: list[str] = []
+
+    def record_notify(self: App[None], message: str, **kwargs: object) -> None:
+        toasts.append(message)
+
+    monkeypatch.setattr(App, "notify", record_notify)
+    gateway = FakeCloudFormationGateway(detail=_detail())
+    app = DetailScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("d")
+        await pilot.pause()
+        await pilot.press("y")
+        await _settle(app)
+        await pilot.pause()
+
+        assert gateway.deleted == ["alpha"]
+        assert any("Delete requested" in toast for toast in toasts)
+        assert isinstance(app.screen, StackDetailScreen)  # stays put; refresh is manual
+
+
+@pytest.mark.asyncio
+async def test_cancelling_delete_does_not_call_gateway() -> None:
+    gateway = FakeCloudFormationGateway(detail=_detail())
+    app = DetailScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("d")
+        await pilot.pause()
+        await pilot.press("escape")
+        await _settle(app)
+        await pilot.pause()
+
+        assert gateway.deleted == []
+        assert isinstance(app.screen, StackDetailScreen)
+
+
+@pytest.mark.asyncio
+async def test_delete_failure_shows_error_toast(monkeypatch: pytest.MonkeyPatch) -> None:
+    toasts: list[str] = []
+
+    def record_notify(self: App[None], message: str, **kwargs: object) -> None:
+        toasts.append(message)
+
+    monkeypatch.setattr(App, "notify", record_notify)
+    gateway = FakeCloudFormationGateway(detail=_detail(), delete_error=AwsError("denied"))
+    app = DetailScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("d")
+        await pilot.pause()
+        await pilot.press("y")
+        await _settle(app)
+        await pilot.pause()
+
+        assert gateway.deleted == []
+        assert "denied" in toasts
+
+
+@pytest.mark.asyncio
+async def test_refresh_after_stack_deleted_notifies_and_pops_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    toasts: list[str] = []
+
+    def record_notify(self: App[None], message: str, **kwargs: object) -> None:
+        toasts.append(message)
+
+    monkeypatch.setattr(App, "notify", record_notify)
+    gateway = FakeCloudFormationGateway(detail=_detail())
+    app = DetailScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        gateway.detail = None
+        gateway.detail_error = StackNotFoundError("Stack alpha does not exist.")
+        await pilot.press("r")
+        await _settle(app)
+        await pilot.pause()
+
+        assert not isinstance(app.screen, StackDetailScreen)
+        assert any("no longer exists" in toast for toast in toasts)
