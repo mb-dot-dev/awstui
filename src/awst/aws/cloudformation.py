@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 
 class CloudFormationGateway:
-    """Read-only access to CloudFormation, returning plain data models."""
+    """Access to CloudFormation, returning plain data models."""
 
     def __init__(self: Self, client: CloudFormationClient) -> None:
         self._client = client
@@ -67,6 +67,16 @@ class CloudFormationGateway:
         except (BotoCoreError, ClientError) as error:
             raise _map_stack_error(error, name) from error
         return _to_detail(stack, resources, events)
+
+    def delete_stack(self: Self, name: str) -> None:
+        """Request deletion of the stack; CloudFormation deletes asynchronously.
+
+        Raises AwsError for any credential, network, or API failure.
+        """
+        try:
+            self._client.delete_stack(StackName=name)
+        except (BotoCoreError, ClientError) as error:
+            raise map_botocore_error(error) from error
 
 
 def _to_summary(stack: StackTypeDef) -> StackSummary:

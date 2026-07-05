@@ -139,3 +139,13 @@ def test_get_stack_detail_returns_events_newest_first() -> None:
 def test_get_stack_detail_raises_stack_not_found_for_missing_stack() -> None:
     with pytest.raises(StackNotFoundError):
         _gateway().get_stack_detail("missing")
+
+
+@mock_aws
+def test_delete_stack_deletes_the_stack() -> None:
+    client = boto3.client("cloudformation", region_name="eu-west-1")
+    client.create_stack(StackName="alpha", TemplateBody=TEMPLATE)
+
+    _gateway().delete_stack("alpha")
+
+    assert _gateway().list_stacks() == []
