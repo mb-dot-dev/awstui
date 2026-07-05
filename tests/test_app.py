@@ -27,7 +27,7 @@ async def test_home_screen_lists_services_with_sqs_still_disabled() -> None:
 
 
 @pytest.mark.asyncio
-async def test_disabled_services_are_skipped_by_navigation() -> None:
+async def test_navigation_skips_disabled_sqs_and_wraps() -> None:
     app = AwstApp(cloudformation_gateway=FakeCloudFormationGateway())
 
     async with app.run_test() as pilot:
@@ -41,7 +41,7 @@ async def test_disabled_services_are_skipped_by_navigation() -> None:
 
         await pilot.press("down")
         await pilot.pause()
-        assert options.highlighted == 1  # nowhere to go: sqs below is disabled
+        assert options.highlighted == 0  # skips disabled sqs, wraps to the top
 
 
 @pytest.mark.asyncio

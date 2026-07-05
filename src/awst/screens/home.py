@@ -56,30 +56,6 @@ def _prompt(entry: ServiceEntry) -> str:
     return f"{entry.name:<18}{entry.resource}{suffix}"
 
 
-class NoWrapOptionList(OptionList):
-    """OptionList that doesn't wrap when navigating with disabled options."""
-
-    def action_cursor_down(self: Self) -> None:
-        """Move down, skipping disabled options but not wrapping."""
-        current = self.highlighted
-        if current is None:
-            return
-        for i in range(current + 1, self.option_count):
-            if not self.get_option_at_index(i).disabled:
-                self.highlighted = i
-                return
-
-    def action_cursor_up(self: Self) -> None:
-        """Move up, skipping disabled options but not wrapping."""
-        current = self.highlighted
-        if current is None:
-            return
-        for i in range(current - 1, -1, -1):
-            if not self.get_option_at_index(i).disabled:
-                self.highlighted = i
-                return
-
-
 class HomeScreen(Screen[None]):
     """Service picker; the app's landing screen."""
 
@@ -94,7 +70,7 @@ class HomeScreen(Screen[None]):
 
     def compose(self: Self) -> ComposeResult:
         yield Static("Select a service", id="prompt")
-        yield NoWrapOptionList(
+        yield OptionList(
             *[Option(_prompt(entry), id=entry.option_id, disabled=not entry.enabled) for entry in SERVICES],
             id="services",
         )
