@@ -9,8 +9,10 @@ from textual.app import App
 from textual.widgets import DataTable, Input, Static
 
 from awst.aws.models import AwsError, StackSummary
+from awst.screens.stack_detail import StackDetailScreen
 from awst.screens.stacks import StackListScreen
 from tests.fakes import FakeCloudFormationGateway
+from tests.test_stack_detail_screen import _detail
 
 
 def _stack(name: str, status: str = "CREATE_COMPLETE") -> StackSummary:
@@ -353,3 +355,41 @@ async def test_refresh_failure_while_filtered_preserves_filter_and_count() -> No
 
         assert filter_input.value == "prod"
         assert "2 of 3 stacks" in str(count.content)
+
+
+@pytest.mark.asyncio
+async def test_enter_on_row_opens_detail_screen_for_that_stack() -> None:
+    gateway = FakeCloudFormationGateway(stacks=[_stack("prod-api"), _stack("prod-network")], detail=_detail())
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("enter")
+        await _settle(app)
+        await pilot.pause()
+
+        assert isinstance(app.screen, StackDetailScreen)
+        assert gateway.detail_calls == ["prod-api"]
+
+
+@pytest.mark.asyncio
+async def test_returning_from_detail_refreshes_the_list() -> None:
+    gateway = FakeCloudFormationGateway(stacks=[_stack("prod-api")], detail=_detail())
+    app = StackScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+        assert gateway.calls == 1
+
+        await pilot.press("enter")
+        await _settle(app)
+        await pilot.pause()
+        await pilot.press("escape")
+        await _settle(app)
+        await pilot.pause()
+
+        assert isinstance(app.screen, StackListScreen)
+        assert gateway.calls == 2
