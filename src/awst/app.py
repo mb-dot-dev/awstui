@@ -8,11 +8,13 @@ import boto3
 from textual.app import App
 
 from awst.aws.cloudformation import CloudFormationGateway
+from awst.aws.lambda_ import LambdaGateway
 from awst.aws.s3 import S3Gateway
 from awst.screens.home import HomeScreen
 
 if TYPE_CHECKING:
     from awst.screens.buckets import BucketLister
+    from awst.screens.functions import FunctionLister
     from awst.screens.stacks import StackGateway
 
 
@@ -23,10 +25,12 @@ class AwstApp(App[None]):
         self: Self,
         cloudformation_gateway: StackGateway | None = None,
         s3_gateway: BucketLister | None = None,
+        lambda_gateway: FunctionLister | None = None,
     ) -> None:
         super().__init__()
         self._cloudformation_gateway = cloudformation_gateway
         self._s3_gateway = s3_gateway
+        self._lambda_gateway = lambda_gateway
 
     @property
     def cloudformation_gateway(self: Self) -> StackGateway:
@@ -43,6 +47,14 @@ class AwstApp(App[None]):
             session = boto3.Session()
             self._s3_gateway = S3Gateway(session.client("s3"))
         return self._s3_gateway
+
+    @property
+    def lambda_gateway(self: Self) -> FunctionLister:
+        """The Lambda gateway, built on first use from the default credential chain."""
+        if self._lambda_gateway is None:
+            session = boto3.Session()
+            self._lambda_gateway = LambdaGateway(session.client("lambda"))
+        return self._lambda_gateway
 
     def on_mount(self: Self) -> None:
         self.push_screen(HomeScreen())
