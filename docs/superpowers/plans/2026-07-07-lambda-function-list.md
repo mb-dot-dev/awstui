@@ -40,7 +40,7 @@ This is a behavior-preserving refactor: the existing bucket-screen tests are the
 - Consumes: `BucketSummary` from `awst.aws.models`, `relative_age` from `awst.screens.formatting` (both exist).
 - Produces: `ResourceListScreen[ItemT](Screen[None])` in `awst.screens.resource_list` with:
   - class attributes subclasses set: `TITLE: str`, `COLUMNS: tuple[str, ...]`, `NOUN: str`
-  - hooks subclasses implement: `_list(self) -> list[ItemT]`, `_row(self, item: ItemT, now: datetime) -> tuple[str | Text, ...]`, `_name(self, item: ItemT) -> str`
+  - hooks subclasses implement: `_list(self) -> list[ItemT]`, `_row(self, item: ItemT, now: datetime) -> tuple[str | Text, ...]`, `_item_name(self, item: ItemT) -> str`
   - protected state subclasses may read: `self._loaded: bool`
   - `action_refresh()` (public to subclasses, used by the stack screen's `on_screen_resume`)
   - widget ids: `#count`, `#filter`, `#items` (the DataTable), `#error` — tests query `DataTable` without an id, so renaming the table id from `#buckets`/`#stacks` to `#items` is safe.
@@ -79,7 +79,7 @@ if TYPE_CHECKING:
 class ResourceListScreen[ItemT](Screen[None]):
     """A filterable, refreshable table of one kind of AWS resource.
 
-    Subclasses set TITLE, COLUMNS, and NOUN, and implement _list, _row, and _name.
+    Subclasses set TITLE, COLUMNS, and NOUN, and implement _list, _row, and _item_name.
     Row selection is a subclass concern: the base does nothing on Enter.
     """
 
@@ -110,7 +110,7 @@ class ResourceListScreen[ItemT](Screen[None]):
         """The table cells for one item, in COLUMNS order."""
         raise NotImplementedError
 
-    def _name(self: Self, item: ItemT) -> str:
+    def _item_name(self: Self, item: ItemT) -> str:
         """The item's unique name, used as the row key and filter target."""
         raise NotImplementedError
 
@@ -171,13 +171,13 @@ class ResourceListScreen[ItemT](Screen[None]):
     def _render_rows(self: Self) -> None:
         table = self.query_one("#items", DataTable)
         query = self.query_one("#filter", Input).value.strip().lower()
-        visible = [item for item in self._all_items if query in self._name(item).lower()]
+        visible = [item for item in self._all_items if query in self._item_name(item).lower()]
         previous = self._cursor_name(table)
         table.clear()
         now = datetime.now(tz=UTC)
         for item in visible:
-            table.add_row(*self._row(item, now), key=self._name(item))
-        names = [self._name(item) for item in visible]
+            table.add_row(*self._row(item, now), key=self._item_name(item))
+        names = [self._item_name(item) for item in visible]
         if previous in names:
             table.move_cursor(row=names.index(previous))
         total = len(self._all_items)
@@ -261,7 +261,7 @@ class BucketListScreen(ResourceListScreen[BucketSummary]):
     def _row(self: Self, item: BucketSummary, now: datetime) -> tuple[str, ...]:
         return (item.name, item.region, relative_age(item.created, now))
 
-    def _name(self: Self, item: BucketSummary) -> str:
+    def _item_name(self: Self, item: BucketSummary) -> str:
         return item.name
 ```
 
@@ -301,7 +301,7 @@ Also a behavior-preserving refactor guarded by existing tests. The stack screen 
 - Test (existing, unchanged): `tests/test_stack_list_screen.py`
 
 **Interfaces:**
-- Consumes: `ResourceListScreen` from Task 1 (attributes `TITLE`/`COLUMNS`/`NOUN`, hooks `_list`/`_row`/`_name`, state `self._loaded`, action `action_refresh()`).
+- Consumes: `ResourceListScreen` from Task 1 (attributes `TITLE`/`COLUMNS`/`NOUN`, hooks `_list`/`_row`/`_item_name`, state `self._loaded`, action `action_refresh()`).
 - Produces: unchanged public API — `StackListScreen(gateway: StackGateway)`, `StackLister`, `StackGateway`.
 
 - [ ] **Step 1: Baseline — run the stack screen tests and confirm they pass**
@@ -365,7 +365,7 @@ class StackListScreen(ResourceListScreen[StackSummary]):
             relative_age(item.updated, now),
         )
 
-    def _name(self: Self, item: StackSummary) -> str:
+    def _item_name(self: Self, item: StackSummary) -> str:
         return item.name
 
     def on_data_table_row_selected(self: Self, event: DataTable.RowSelected) -> None:
@@ -922,7 +922,7 @@ class FunctionListScreen(ResourceListScreen[FunctionSummary]):
             relative_age(item.modified, now),
         )
 
-    def _name(self: Self, item: FunctionSummary) -> str:
+    def _item_name(self: Self, item: FunctionSummary) -> str:
         return item.name
 ```
 
