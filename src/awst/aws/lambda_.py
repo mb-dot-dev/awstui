@@ -29,7 +29,8 @@ class LambdaGateway:
         try:
             paginator = self._client.get_paginator("list_functions")
             functions = [_to_summary(function) for page in paginator.paginate() for function in page["Functions"]]
-        except (BotoCoreError, ClientError) as error:
+        except (BotoCoreError, ClientError, ValueError) as error:
+            # ValueError: _to_summary rejects an unparseable LastModified string
             raise map_botocore_error(error) from error
         return sorted(functions, key=lambda function: function.name)
 

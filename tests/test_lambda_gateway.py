@@ -102,6 +102,20 @@ def test_to_summary_defaults_runtime_to_empty_for_image_functions() -> None:
     assert summary.runtime == ""
 
 
+def test_list_functions_maps_malformed_last_modified_to_aws_error() -> None:
+    client = boto3.client("lambda", region_name="eu-west-1")
+    with Stubber(client) as stubber:
+        stubber.add_response(
+            "list_functions",
+            {"Functions": [{"FunctionName": "alpha", "LastModified": "not-a-timestamp"}]},
+        )
+
+        with pytest.raises(AwsError) as excinfo:
+            LambdaGateway(client).list_functions()
+
+    assert "not-a-timestamp" in excinfo.value.message
+
+
 def test_list_functions_maps_client_error_to_aws_error() -> None:
     client = boto3.client("lambda", region_name="eu-west-1")
     with Stubber(client) as stubber:
