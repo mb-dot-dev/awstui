@@ -67,7 +67,7 @@ Subclasses provide only:
   text and the filter placeholder)
 - `_list(self) -> list[ItemT]` — call the gateway
 - `_row(self, item, now) -> tuple` — the cells for one row
-- `_name(self, item) -> str` — the filter key / row key
+- `_item_name(self, item) -> str` (renamed from _name: Textual's DOMNode sets a _name instance attribute) — the filter key / row key
 
 Row selection stays a subclass concern: the base does nothing on Enter.
 `StackListScreen` keeps its `on_data_table_row_selected` (push detail screen)

@@ -39,7 +39,7 @@ def _to_summary(function: FunctionConfigurationTypeDef) -> FunctionSummary:
     return FunctionSummary(
         name=function["FunctionName"],
         runtime=function.get("Runtime", ""),
-        memory_mb=function["MemorySize"],
-        timeout_s=function["Timeout"],
+        memory_mb=function.get("MemorySize", 0),
+        timeout_s=function.get("Timeout", 0),
         modified=datetime.fromisoformat(function["LastModified"]),
     )
