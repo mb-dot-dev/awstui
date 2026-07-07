@@ -151,8 +151,8 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "boto3-stubs", extra = ["cloudformation", "s3"] },
-    { name = "moto", extra = ["cloudformation", "s3"] },
+    { name = "boto3-stubs", extra = ["cloudformation", "lambda", "s3"] },
+    { name = "moto", extra = ["awslambda", "cloudformation", "s3"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -169,8 +169,8 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "boto3-stubs", extras = ["cloudformation", "s3"], specifier = ">=1.43.40" },
-    { name = "moto", extras = ["cloudformation", "s3"], specifier = ">=5.2.2" },
+    { name = "boto3-stubs", extras = ["cloudformation", "lambda", "s3"], specifier = ">=1.43.40" },
+    { name = "moto", extras = ["awslambda", "cloudformation", "s3"], specifier = ">=5.2.2" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
@@ -209,6 +209,9 @@ wheels = [
 [package.optional-dependencies]
 cloudformation = [
     { name = "mypy-boto3-cloudformation" },
+]
+lambda = [
+    { name = "mypy-boto3-lambda" },
 ]
 s3 = [
     { name = "mypy-boto3-s3" },
@@ -742,6 +745,9 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+awslambda = [
+    { name = "docker" },
+]
 cloudformation = [
     { name = "aws-xray-sdk" },
     { name = "cfn-lint" },
@@ -850,6 +856,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/2a/a1/55bf2c2abf3ab3056212196cba1492a0d64dedff50bac9b488b21ea4bf62/mypy_boto3_cloudformation-1.43.38.tar.gz", hash = "sha256:bb4ae3b29345d35acc4cd135802af132503ce557b531ad0a19bec5cc7b821a3a", size = 61464, upload-time = "2026-06-30T21:05:53.313Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9a/b6/49165858d56ff1f4113ce2f701b322eedde44499241c1c730eb501134267/mypy_boto3_cloudformation-1.43.38-py3-none-any.whl", hash = "sha256:48f0a90c77e50580258fd5b0acf60aed93aebc0bc8df6f890a465d8cd7a23cc1", size = 72411, upload-time = "2026-06-30T21:05:51.011Z" },
+]
+
+[[package]]
+name = "mypy-boto3-lambda"
+version = "1.43.37"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/94/58d80a719bf29d57996524aa28e73da611267e5d6dae0de4db04861853f5/mypy_boto3_lambda-1.43.37.tar.gz", hash = "sha256:2d8155e3389c7afa1334da3e2eb2879364e25f24c0a431bea1aeea1e735f271c", size = 52506, upload-time = "2026-06-29T21:57:04.431Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/37/4f4a1f71ae3c3bbba34839365cba35a7bc298aec715b664a91cb953d332a/mypy_boto3_lambda-1.43.37-py3-none-any.whl", hash = "sha256:0fee7882e6d17d7c969772bffefcd51abd2ea2427c1193a588599d404d92d1a8", size = 60908, upload-time = "2026-06-29T21:57:02.418Z" },
 ]
 
 [[package]]
