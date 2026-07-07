@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class ResourceListScreen[ItemT](Screen[None]):
     """A filterable, refreshable table of one kind of AWS resource.
 
-    Subclasses set TITLE, COLUMNS, and NOUN, and implement _list, _row, and _name.
+    Subclasses set TITLE, COLUMNS, and NOUN, and implement _list, _row, and _item_name.
     Row selection is a subclass concern: the base does nothing on Enter.
     """
 
@@ -53,7 +53,7 @@ class ResourceListScreen[ItemT](Screen[None]):
         """The table cells for one item, in COLUMNS order."""
         raise NotImplementedError
 
-    def _name(self: Self, item: ItemT) -> str:
+    def _item_name(self: Self, item: ItemT) -> str:
         """The item's unique name, used as the row key and filter target."""
         raise NotImplementedError
 
@@ -114,15 +114,13 @@ class ResourceListScreen[ItemT](Screen[None]):
     def _render_rows(self: Self) -> None:
         table = self.query_one("#items", DataTable)
         query = self.query_one("#filter", Input).value.strip().lower()
-        # Use explicit method resolution to work around Textual's _name attribute shadowing
-        _get_name: type = self.__class__
-        visible = [item for item in self._all_items if query in _get_name._name(self, item).lower()]  # noqa: SLF001
+        visible = [item for item in self._all_items if query in self._item_name(item).lower()]
         previous = self._cursor_name(table)
         table.clear()
         now = datetime.now(tz=UTC)
         for item in visible:
-            table.add_row(*self._row(item, now), key=_get_name._name(self, item))  # noqa: SLF001
-        names = [_get_name._name(self, item) for item in visible]  # noqa: SLF001
+            table.add_row(*self._row(item, now), key=self._item_name(item))
+        names = [self._item_name(item) for item in visible]
         if previous in names:
             table.move_cursor(row=names.index(previous))
         total = len(self._all_items)

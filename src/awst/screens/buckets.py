@@ -35,5 +35,5 @@ class BucketListScreen(ResourceListScreen[BucketSummary]):
     def _row(self: Self, item: BucketSummary, now: datetime) -> tuple[str, ...]:
         return (item.name, item.region, relative_age(item.created, now))
 
-    def _name(self: Self, item: BucketSummary) -> str:
+    def _item_name(self: Self, item: BucketSummary) -> str:
         return item.name
