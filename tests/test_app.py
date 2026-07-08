@@ -5,10 +5,19 @@ from textual.widgets import DataTable, OptionList
 
 from awst.app import AwstApp
 from awst.screens.buckets import BucketListScreen
+from awst.screens.functions import FunctionListScreen
 from awst.screens.home import HomeScreen
 from awst.screens.stack_detail import StackDetailScreen
 from awst.screens.stacks import StackListScreen
-from tests.fakes import FakeCloudFormationGateway, FakeS3Gateway, make_bucket, make_detail, make_stack
+from tests.fakes import (
+    FakeCloudFormationGateway,
+    FakeLambdaGateway,
+    FakeS3Gateway,
+    make_bucket,
+    make_detail,
+    make_function,
+    make_stack,
+)
 
 
 @pytest.mark.asyncio
@@ -20,9 +29,10 @@ async def test_home_screen_lists_services_with_sqs_still_disabled() -> None:
         options = app.screen.query_one(OptionList)
 
         assert isinstance(app.screen, HomeScreen)
-        assert options.option_count == 3
+        assert options.option_count == 4
         assert options.get_option("cloudformation").disabled is False
         assert options.get_option("s3").disabled is False
+        assert options.get_option("lambda").disabled is False
         assert options.get_option("sqs").disabled is True
 
 
@@ -37,7 +47,11 @@ async def test_navigation_skips_disabled_sqs_and_wraps() -> None:
 
         await pilot.press("down")
         await pilot.pause()
-        assert options.highlighted == 1  # s3 is enabled now
+        assert options.highlighted == 1  # s3
+
+        await pilot.press("down")
+        await pilot.pause()
+        assert options.highlighted == 2  # lambda
 
         await pilot.press("down")
         await pilot.pause()
@@ -79,6 +93,25 @@ async def test_selecting_s3_opens_bucket_list() -> None:
         await pilot.pause()
 
         assert isinstance(app.screen, BucketListScreen)
+        assert app.screen.query_one(DataTable).row_count == 1
+
+
+@pytest.mark.asyncio
+async def test_selecting_lambda_opens_function_list() -> None:
+    app = AwstApp(
+        cloudformation_gateway=FakeCloudFormationGateway(),
+        lambda_gateway=FakeLambdaGateway(functions=[make_function("resize-images")]),
+    )
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("down")  # s3
+        await pilot.press("down")  # lambda
+        await pilot.press("enter")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+
+        assert isinstance(app.screen, FunctionListScreen)
         assert app.screen.query_one(DataTable).row_count == 1
 
 

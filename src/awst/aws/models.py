@@ -32,6 +32,17 @@ class BucketSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class FunctionSummary:
+    """A Lambda function, reduced to what the UI needs."""
+
+    name: str
+    runtime: str  # "" for container-image functions
+    memory_mb: int
+    timeout_s: int
+    modified: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class StackSummary:
     """A CloudFormation stack, reduced to what the UI needs."""
 
