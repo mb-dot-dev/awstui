@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import hashlib
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Self
 
@@ -21,6 +23,10 @@ _CLIENT_TYPE = "public"
 _GRANT_TYPE = "urn:ietf:params:oauth:grant-type:device_code"
 _DEFAULT_CACHE_DIR = Path("~/.aws/sso/cache")
 _DEFAULT_POLL_INTERVAL_S = 5
+
+
+def _utc_iso(moment: datetime) -> str:
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class SsoLoginGateway:
@@ -80,3 +86,30 @@ class SsoLoginGateway:
             expires_at=datetime.now(tz=UTC) + timedelta(seconds=response["expiresIn"]),
             refresh_token=response.get("refreshToken"),
         )
+
+    def write_token_cache(self: Self, config: SsoConfig, authorization: DeviceAuthorization, token: SsoToken) -> None:
+        """Persist the token where botocore's SSO credential provider reads it.
+
+        The filename and JSON shape mirror what the AWS CLI writes — botocore has no
+        public API for this. The whole format lives in this one method, and the tests
+        pin it so a botocore change is caught here.
+        """
+        entry: dict[str, str] = {
+            "startUrl": config.start_url,
+            "region": config.sso_region,
+            "accessToken": token.access_token,
+            "expiresAt": _utc_iso(token.expires_at),
+        }
+        if config.session_name is not None:
+            entry["clientId"] = authorization.client_id
+            entry["clientSecret"] = authorization.client_secret
+            entry["registrationExpiresAt"] = _utc_iso(authorization.registration_expires_at)
+            if token.refresh_token is not None:
+                entry["refreshToken"] = token.refresh_token
+        cache_key = config.session_name or config.start_url
+        directory = self._cache_dir.expanduser()
+        directory.mkdir(parents=True, exist_ok=True)
+        # SHA-1 is the CLI's cache-filename convention, not a security control.
+        path = directory / f"{hashlib.sha1(cache_key.encode()).hexdigest()}.json"  # noqa: S324
+        path.write_text(json.dumps(entry))
+        path.chmod(0o600)

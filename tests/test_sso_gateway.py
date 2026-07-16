@@ -1,6 +1,12 @@
 """Tests for the SSO OIDC login gateway."""
 
+from __future__ import annotations
+
 from datetime import UTC, datetime
+import hashlib
+import json
+import re
+from typing import TYPE_CHECKING
 
 import boto3
 from botocore.stub import Stubber
@@ -8,7 +14,12 @@ import pytest
 
 from awst.aws.models import AwsError, SlowDownError
 from awst.aws.sso import SsoLoginGateway
-from tests.fakes import make_device_authorization, make_sso_config
+from tests.fakes import make_device_authorization, make_sso_config, make_sso_token
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+_ISO_UTC = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"
 
 _REGISTER_EXPECTED = {"clientName": "awst", "clientType": "public"}
 _REGISTER_RESPONSE = {
@@ -126,3 +137,54 @@ def test_poll_token_refresh_token_is_none_when_absent() -> None:
 
     assert token is not None
     assert token.refresh_token is None
+
+
+def test_write_token_cache_legacy_profile_keys_on_start_url(tmp_path: Path) -> None:
+    gateway = SsoLoginGateway(_client(), cache_dir=tmp_path)
+    config = make_sso_config()
+
+    gateway.write_token_cache(config, make_device_authorization(), make_sso_token())
+
+    expected_name = hashlib.sha1(config.start_url.encode()).hexdigest() + ".json"  # noqa: S324
+    entry = json.loads((tmp_path / expected_name).read_text())
+    assert entry["startUrl"] == config.start_url
+    assert entry["region"] == "eu-west-1"
+    assert entry["accessToken"] == "access-token"
+    assert re.fullmatch(_ISO_UTC, entry["expiresAt"])
+    assert "clientId" not in entry
+    assert "refreshToken" not in entry
+
+
+def test_write_token_cache_sso_session_profile_keys_on_session_name(tmp_path: Path) -> None:
+    gateway = SsoLoginGateway(_client(), cache_dir=tmp_path)
+    config = make_sso_config(session_name="corp")
+
+    gateway.write_token_cache(config, make_device_authorization(), make_sso_token(refresh_token="refresh"))
+
+    expected_name = hashlib.sha1(b"corp").hexdigest() + ".json"  # noqa: S324
+    entry = json.loads((tmp_path / expected_name).read_text())
+    assert entry["startUrl"] == config.start_url
+    assert entry["clientId"] == "client-id"
+    assert entry["clientSecret"] == "client-secret"
+    assert re.fullmatch(_ISO_UTC, entry["registrationExpiresAt"])
+    assert entry["refreshToken"] == "refresh"
+
+
+def test_write_token_cache_omits_refresh_token_when_absent(tmp_path: Path) -> None:
+    gateway = SsoLoginGateway(_client(), cache_dir=tmp_path)
+    config = make_sso_config(session_name="corp")
+
+    gateway.write_token_cache(config, make_device_authorization(), make_sso_token())
+
+    expected_name = hashlib.sha1(b"corp").hexdigest() + ".json"  # noqa: S324
+    entry = json.loads((tmp_path / expected_name).read_text())
+    assert "refreshToken" not in entry
+
+
+def test_write_token_cache_creates_the_cache_directory(tmp_path: Path) -> None:
+    cache_dir = tmp_path / "sso" / "cache"
+    gateway = SsoLoginGateway(_client(), cache_dir=cache_dir)
+
+    gateway.write_token_cache(make_sso_config(), make_device_authorization(), make_sso_token())
+
+    assert len(list(cache_dir.iterdir())) == 1
