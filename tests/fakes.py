@@ -177,6 +177,47 @@ class FakeSqsGateway:
         return list(self.queues)
 
 
+class FakeSsoLoginGateway:
+    """In-memory stand-in for the SSO OIDC login gateway."""
+
+    def __init__(
+        self: Self,
+        authorization: DeviceAuthorization | None = None,
+        token: SsoToken | None = None,
+        pending_polls: int = 0,
+        start_error: AwsError | None = None,
+        poll_error: AwsError | None = None,
+    ) -> None:
+        self.authorization = authorization or make_device_authorization()
+        self.token = token or make_sso_token()
+        self.pending_polls = pending_polls
+        self.start_error = start_error
+        self.poll_error = poll_error
+        self.poll_calls = 0
+        self.cached: list[tuple[SsoConfig, DeviceAuthorization, SsoToken]] = []
+
+    def start_device_authorization(self: Self, config: SsoConfig) -> DeviceAuthorization:  # noqa: ARG002
+        if self.start_error is not None:
+            raise self.start_error
+        return self.authorization
+
+    def poll_token(self: Self, authorization: DeviceAuthorization) -> SsoToken | None:  # noqa: ARG002
+        self.poll_calls += 1
+        if self.poll_error is not None:
+            raise self.poll_error
+        if self.poll_calls <= self.pending_polls:
+            return None
+        return self.token
+
+    def write_token_cache(
+        self: Self,
+        config: SsoConfig,
+        authorization: DeviceAuthorization,
+        token: SsoToken,
+    ) -> None:
+        self.cached.append((config, authorization, token))
+
+
 def make_sso_config(session_name: str | None = None) -> SsoConfig:
     """SSO settings matching the canned device-flow responses in tests."""
     return SsoConfig(start_url="https://legacy.awsapps.com/start", sso_region="eu-west-1", session_name=session_name)
