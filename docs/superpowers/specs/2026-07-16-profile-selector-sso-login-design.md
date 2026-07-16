@@ -62,9 +62,9 @@ Owns all profile/credential-environment access, keeping boto3/botocore out of sc
 
 An `SsoLoginGateway` in the existing gateway style, wrapping a boto3 `sso-oidc` client
 built for the profile's `sso_region`. The frozen models it exchanges (`SsoConfig`,
-`DeviceAuthorization`, `SsoToken`) live in `aws/models.py` with the rest; the
-`SlowDownRequested` exception lives in `sso.py`. It drives the OIDC
-device-authorization flow:
+`DeviceAuthorization`, `SsoToken`) live in `aws/models.py` with the rest, as does the
+`SlowDownError` exception (screens import exceptions only from `models.py`). It drives
+the OIDC device-authorization flow:
 
 - `start_device_authorization(config: SsoConfig) -> DeviceAuthorization` — calls
   `register_client` (client name `awst`, type `public`) then
@@ -73,10 +73,10 @@ device-authorization flow:
   plus the registration's `client_id`/`client_secret`/`registration_expires_at`.
 - `poll_token(authorization: DeviceAuthorization) -> SsoToken | None` — one
   `create_token` attempt with the device-code grant. Returns `None` while
-  `AuthorizationPendingException`; raises `SlowDownRequested` (carrying the increased
-  interval) on `SlowDownException`; raises `AwsError` on `ExpiredTokenException` or any
-  other failure. On success returns an `SsoToken` (`access_token`, `expires_at`,
-  `refresh_token` when present).
+  `AuthorizationPendingException`; raises `SlowDownError` on `SlowDownException` (the
+  poller then adds 5 seconds to its interval); raises `AwsError` on
+  `ExpiredTokenException` or any other failure. On success returns an `SsoToken`
+  (`access_token`, `expires_at`, `refresh_token` when present).
 - `write_token_cache(config: SsoConfig, authorization: DeviceAuthorization, token: SsoToken) -> None` —
   persists the token where botocore's credential resolver reads it:
   `~/.aws/sso/cache/<sha1>.json` (cache directory overridable for tests). The cache key
