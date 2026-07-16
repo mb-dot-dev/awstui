@@ -7,11 +7,13 @@ from typing import TYPE_CHECKING, Self
 import boto3
 from textual.app import App
 
+from awst.aws import profiles
 from awst.aws.cloudformation import CloudFormationGateway
 from awst.aws.lambda_ import LambdaGateway
 from awst.aws.s3 import S3Gateway
 from awst.aws.sqs import SqsGateway
 from awst.screens.home import HomeScreen
+from awst.screens.profiles import ProfileSelectScreen
 
 if TYPE_CHECKING:
     from awst.screens.buckets import BucketLister
@@ -69,4 +71,19 @@ class AwstApp(App[None]):
         return self._sqs_gateway
 
     def on_mount(self: Self) -> None:
+        profile = profiles.active_profile()
+        if profile is not None:
+            self.sub_title = profile
+            self.push_screen(HomeScreen())
+            return
+        names = profiles.available_profiles()
+        if names:
+            self.push_screen(ProfileSelectScreen(names), self._on_profile_selected)
+        else:
+            self.push_screen(HomeScreen())
+
+    def _on_profile_selected(self: Self, name: str | None) -> None:
+        if name is not None:
+            profiles.select_profile(name)
+            self.sub_title = name
         self.push_screen(HomeScreen())
