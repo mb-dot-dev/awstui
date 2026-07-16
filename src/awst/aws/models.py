@@ -18,6 +18,10 @@ class AwsError(Exception):
         self.hint = hint
 
 
+class CredentialsError(AwsError):
+    """AWS credentials are missing or expired; logging in may fix it."""
+
+
 class StackNotFoundError(AwsError):
     """The named stack does not exist (for example, it finished deleting)."""
 
