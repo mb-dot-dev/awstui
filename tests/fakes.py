@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Self
 
 from awst.aws.models import (
     BucketSummary,
+    DeviceAuthorization,
     FunctionSummary,
     QueueSummary,
+    SsoConfig,
+    SsoToken,
     StackDetail,
     StackEvent,
     StackNotFoundError,
@@ -172,3 +175,33 @@ class FakeSqsGateway:
         if self.error is not None:
             raise self.error
         return list(self.queues)
+
+
+def make_sso_config(session_name: str | None = None) -> SsoConfig:
+    """SSO settings matching the canned device-flow responses in tests."""
+    return SsoConfig(start_url="https://legacy.awsapps.com/start", sso_region="eu-west-1", session_name=session_name)
+
+
+def make_device_authorization(interval: int = 0, expires_in_s: int = 600) -> DeviceAuthorization:
+    """A device authorization with sensible defaults; interval 0 keeps tests fast."""
+    now = datetime.now(tz=UTC)
+    return DeviceAuthorization(
+        client_id="client-id",
+        client_secret="client-secret",
+        registration_expires_at=now + timedelta(days=90),
+        device_code="device-code",
+        user_code="ABCD-EFGH",
+        verification_uri="https://device.sso.eu-west-1.amazonaws.com/",
+        verification_uri_complete="https://device.sso.eu-west-1.amazonaws.com/?user_code=ABCD-EFGH",
+        interval=interval,
+        expires_at=now + timedelta(seconds=expires_in_s),
+    )
+
+
+def make_sso_token(refresh_token: str | None = None) -> SsoToken:
+    """An SSO access token for login-flow tests."""
+    return SsoToken(
+        access_token="access-token",
+        expires_at=datetime.now(tz=UTC) + timedelta(hours=8),
+        refresh_token=refresh_token,
+    )

@@ -26,6 +26,10 @@ class StackNotFoundError(AwsError):
     """The named stack does not exist (for example, it finished deleting)."""
 
 
+class SlowDownError(Exception):
+    """The SSO OIDC service asked us to poll less often; wait longer and retry."""
+
+
 @dataclass(frozen=True, slots=True)
 class SsoConfig:
     """The SSO settings a profile uses to log in.
@@ -37,6 +41,30 @@ class SsoConfig:
     start_url: str
     sso_region: str
     session_name: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DeviceAuthorization:
+    """One in-flight SSO OIDC device authorization, plus its client registration."""
+
+    client_id: str
+    client_secret: str
+    registration_expires_at: datetime
+    device_code: str
+    user_code: str
+    verification_uri: str
+    verification_uri_complete: str
+    interval: int
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class SsoToken:
+    """An SSO access token minted by the device flow."""
+
+    access_token: str
+    expires_at: datetime
+    refresh_token: str | None
 
 
 @dataclass(frozen=True, slots=True)
