@@ -156,7 +156,7 @@ def test_write_token_cache_legacy_profile_keys_on_start_url(tmp_path: Path) -> N
 
     gateway.write_token_cache(config, make_device_authorization(), make_sso_token())
 
-    expected_name = hashlib.sha1(config.start_url.encode()).hexdigest() + ".json"  # noqa: S324
+    expected_name = hashlib.sha1(config.start_url.encode(), usedforsecurity=False).hexdigest() + ".json"
     entry = json.loads((tmp_path / expected_name).read_text())
     assert entry["startUrl"] == config.start_url
     assert entry["region"] == "eu-west-1"
@@ -172,7 +172,7 @@ def test_write_token_cache_sso_session_profile_keys_on_session_name(tmp_path: Pa
 
     gateway.write_token_cache(config, make_device_authorization(), make_sso_token(refresh_token="refresh"))
 
-    expected_name = hashlib.sha1(b"corp").hexdigest() + ".json"  # noqa: S324
+    expected_name = hashlib.sha1(b"corp", usedforsecurity=False).hexdigest() + ".json"
     entry = json.loads((tmp_path / expected_name).read_text())
     assert entry["startUrl"] == config.start_url
     assert entry["clientId"] == "client-id"
@@ -187,7 +187,7 @@ def test_write_token_cache_omits_refresh_token_when_absent(tmp_path: Path) -> No
 
     gateway.write_token_cache(config, make_device_authorization(), make_sso_token())
 
-    expected_name = hashlib.sha1(b"corp").hexdigest() + ".json"  # noqa: S324
+    expected_name = hashlib.sha1(b"corp", usedforsecurity=False).hexdigest() + ".json"
     entry = json.loads((tmp_path / expected_name).read_text())
     assert "refreshToken" not in entry
 
@@ -203,7 +203,7 @@ def test_write_token_cache_file_is_owner_only(tmp_path: Path) -> None:
 
 def test_write_token_cache_tightens_an_existing_looser_cache_file(tmp_path: Path) -> None:
     config = make_sso_config()
-    existing = tmp_path / (hashlib.sha1(config.start_url.encode()).hexdigest() + ".json")  # noqa: S324
+    existing = tmp_path / (hashlib.sha1(config.start_url.encode(), usedforsecurity=False).hexdigest() + ".json")
     existing.write_text("{}")
     existing.chmod(0o644)
     gateway = SsoLoginGateway(_client(), cache_dir=tmp_path)

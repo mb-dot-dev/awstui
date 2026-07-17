@@ -111,7 +111,7 @@ class SsoLoginGateway:
         directory = self._cache_dir.expanduser()
         directory.mkdir(parents=True, exist_ok=True)
         # SHA-1 is the CLI's cache-filename convention, not a security control.
-        path = directory / f"{hashlib.sha1(cache_key.encode()).hexdigest()}.json"  # noqa: S324
+        path = directory / f"{hashlib.sha1(cache_key.encode(), usedforsecurity=False).hexdigest()}.json"
         # Make the file owner-only before the token lands in it (touch mode is
         # umask-masked and doesn't affect existing files, hence the chmod).
         path.touch(mode=0o600)
