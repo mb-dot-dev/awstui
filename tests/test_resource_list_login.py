@@ -15,6 +15,7 @@ from textual.worker import WorkerCancelled, WorkerFailed
 
 from awst.app import AwstApp
 from awst.aws.models import AwsError, CredentialsError
+from awst.aws.sso import SsoLoginGateway
 from awst.screens.buckets import BucketListScreen
 from awst.screens.sso_login import SsoLoginScreen
 from tests.fakes import FakeS3Gateway, FakeSsoLoginGateway, make_bucket, make_device_authorization
@@ -31,6 +32,16 @@ sso_region = eu-west-1
 _PLAIN_CONFIG = """\
 [profile dev]
 region = eu-west-1
+"""
+
+_SSO_SESSION_CONFIG = """\
+[profile dev]
+sso_session = corp
+region = eu-west-1
+
+[sso-session corp]
+sso_start_url = https://corp.awsapps.com/start
+sso_region = us-east-1
 """
 
 
@@ -150,6 +161,21 @@ async def test_no_login_for_non_credential_errors(monkeypatch: pytest.MonkeyPatc
         await pilot.press("l")
         await pilot.pause()
         assert isinstance(app.screen, BucketListScreen)
+
+
+@pytest.mark.asyncio
+async def test_make_sso_login_screen_builds_a_real_gateway_for_the_sso_region(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When no sso_gateway_factory is injected, the real branch builds a client for the sso-session region."""
+    _activate_profile(monkeypatch, _SSO_SESSION_CONFIG)
+    app = AwstApp(s3_gateway=FakeS3Gateway())
+
+    screen = app.make_sso_login_screen()
+
+    gateway = screen._gateway  # noqa: SLF001
+    assert isinstance(gateway, SsoLoginGateway)
+    assert gateway._client.meta.region_name == "us-east-1"  # noqa: SLF001
 
 
 @pytest.mark.asyncio

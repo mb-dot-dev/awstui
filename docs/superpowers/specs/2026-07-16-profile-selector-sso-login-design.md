@@ -117,9 +117,12 @@ All botocore exceptions are translated through the existing `map_botocore_error`
 ### Testability seam
 
 Screens never import boto3/botocore, so profile helpers reach screens the same way
-gateways do: `AwstApp` takes injectable constructor parameters defaulting to the real
-`aws.profiles` functions, and screens call them via the app. `ProfileSelectScreen` takes
-a plain list of names.
+gateways do: `AwstApp` calls the `aws.profiles` functions directly (they read
+process env vars and botocore config, so tests exercise them hermetically through
+real config files rather than injection — this beats a fake, since it also exercises
+real botocore config parsing). Only the SSO gateway factory (`sso_gateway_factory`)
+is an injectable constructor parameter. `ProfileSelectScreen` takes a plain list of
+names.
 
 ## Error handling
 
