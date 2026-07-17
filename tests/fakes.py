@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Self
 
 from awst.aws.models import (
     BucketSummary,
+    DeviceAuthorization,
     FunctionSummary,
     QueueSummary,
+    SsoConfig,
+    SsoToken,
     StackDetail,
     StackEvent,
     StackNotFoundError,
@@ -172,3 +175,74 @@ class FakeSqsGateway:
         if self.error is not None:
             raise self.error
         return list(self.queues)
+
+
+class FakeSsoLoginGateway:
+    """In-memory stand-in for the SSO OIDC login gateway."""
+
+    def __init__(
+        self: Self,
+        authorization: DeviceAuthorization | None = None,
+        token: SsoToken | None = None,
+        pending_polls: int = 0,
+        start_error: AwsError | None = None,
+        poll_error: AwsError | None = None,
+    ) -> None:
+        self.authorization = authorization or make_device_authorization()
+        self.token = token or make_sso_token()
+        self.pending_polls = pending_polls
+        self.start_error = start_error
+        self.poll_error = poll_error
+        self.poll_calls = 0
+        self.cached: list[tuple[SsoConfig, DeviceAuthorization, SsoToken]] = []
+
+    def start_device_authorization(self: Self, config: SsoConfig) -> DeviceAuthorization:  # noqa: ARG002
+        if self.start_error is not None:
+            raise self.start_error
+        return self.authorization
+
+    def poll_token(self: Self, authorization: DeviceAuthorization) -> SsoToken | None:  # noqa: ARG002
+        self.poll_calls += 1
+        if self.poll_error is not None:
+            raise self.poll_error
+        if self.poll_calls <= self.pending_polls:
+            return None
+        return self.token
+
+    def write_token_cache(
+        self: Self,
+        config: SsoConfig,
+        authorization: DeviceAuthorization,
+        token: SsoToken,
+    ) -> None:
+        self.cached.append((config, authorization, token))
+
+
+def make_sso_config(session_name: str | None = None) -> SsoConfig:
+    """SSO settings matching the canned device-flow responses in tests."""
+    return SsoConfig(start_url="https://legacy.awsapps.com/start", sso_region="eu-west-1", session_name=session_name)
+
+
+def make_device_authorization(interval: int = 0, expires_in_s: int = 600) -> DeviceAuthorization:
+    """A device authorization with sensible defaults; interval 0 keeps tests fast."""
+    now = datetime.now(tz=UTC)
+    return DeviceAuthorization(
+        client_id="client-id",
+        client_secret="client-secret",
+        registration_expires_at=now + timedelta(days=90),
+        device_code="device-code",
+        user_code="ABCD-EFGH",
+        verification_uri="https://device.sso.eu-west-1.amazonaws.com/",
+        verification_uri_complete="https://device.sso.eu-west-1.amazonaws.com/?user_code=ABCD-EFGH",
+        interval=interval,
+        expires_at=now + timedelta(seconds=expires_in_s),
+    )
+
+
+def make_sso_token(refresh_token: str | None = None) -> SsoToken:
+    """An SSO access token for login-flow tests."""
+    return SsoToken(
+        access_token="access-token",
+        expires_at=datetime.now(tz=UTC) + timedelta(hours=8),
+        refresh_token=refresh_token,
+    )

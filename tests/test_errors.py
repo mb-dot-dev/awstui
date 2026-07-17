@@ -7,13 +7,15 @@ from botocore.exceptions import (
     ClientError,
     EndpointConnectionError,
     NoCredentialsError,
+    SSOTokenLoadError,
     TokenRetrievalError,
+    UnauthorizedSSOTokenError,
 )
 import pytest
 
 from awst.aws.cloudformation import CloudFormationGateway
 from awst.aws.errors import map_botocore_error
-from awst.aws.models import AwsError
+from awst.aws.models import AwsError, CredentialsError
 
 if TYPE_CHECKING:
     from mypy_boto3_cloudformation import CloudFormationClient
@@ -70,3 +72,24 @@ def test_list_stacks_raises_aws_error() -> None:
         gateway.list_stacks()
 
     assert excinfo.value.hint is not None
+
+
+@pytest.mark.parametrize(
+    "botocore_error",
+    [
+        NoCredentialsError(),
+        SSOTokenLoadError(profile_name="dev", error_msg="missing"),
+        TokenRetrievalError(provider="sso", error_msg="expired"),
+        UnauthorizedSSOTokenError(),
+    ],
+)
+def test_credential_failures_map_to_credentials_error(botocore_error: Exception) -> None:
+    error = map_botocore_error(botocore_error)
+
+    assert isinstance(error, CredentialsError)
+
+
+def test_non_credential_failures_are_not_credentials_errors() -> None:
+    error = map_botocore_error(BotoCoreError())
+
+    assert not isinstance(error, CredentialsError)

@@ -151,7 +151,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "boto3-stubs", extra = ["cloudformation", "lambda", "s3", "sqs"] },
+    { name = "boto3-stubs", extra = ["cloudformation", "lambda", "s3", "sqs", "sso-oidc"] },
     { name = "moto", extra = ["awslambda", "cloudformation", "s3"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -169,7 +169,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "boto3-stubs", extras = ["cloudformation", "lambda", "s3", "sqs"], specifier = ">=1.43.40" },
+    { name = "boto3-stubs", extras = ["cloudformation", "lambda", "s3", "sqs", "sso-oidc"], specifier = ">=1.43.40" },
     { name = "moto", extras = ["awslambda", "cloudformation", "s3", "sqs"], specifier = ">=5.2.2" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
@@ -218,6 +218,9 @@ s3 = [
 ]
 sqs = [
     { name = "mypy-boto3-sqs" },
+]
+sso-oidc = [
+    { name = "mypy-boto3-sso-oidc" },
 ]
 
 [[package]]
@@ -886,6 +889,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/42/1e/226725696a99c7dadfe8ebfba01575107fa15146029a7fb0082c650d8689/mypy_boto3_sqs-1.43.0.tar.gz", hash = "sha256:3ec8e1e651e830affcf7fe151b2e3090b8ea98d73cb069053b09ca4c7f4c8636", size = 23318, upload-time = "2026-04-29T23:06:17.614Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f2/5e/5d4deb1ee7aec7fcdddbca616c623f07bfc72a1cd3e80b0e2a0c39904fae/mypy_boto3_sqs-1.43.0-py3-none-any.whl", hash = "sha256:f90225486756a4041db9f056967cb3cee202264bbe57682031c1e94d83e8ca39", size = 33604, upload-time = "2026-04-29T23:06:15.339Z" },
+]
+
+[[package]]
+name = "mypy-boto3-sso-oidc"
+version = "1.43.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/81/c9/525a4db186c959035b31ceead18eb94f0a924edbac7df748a428b24f030f/mypy_boto3_sso_oidc-1.43.0.tar.gz", hash = "sha256:accae6c9b2a99462983c5af570841a1d1b3f6f070a1589455824117bb3f15ce9", size = 15698, upload-time = "2026-04-29T23:06:29.176Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/cd/cfcf9879ad2345cc13802f1040f77c0fe994fbd708cbeebb6846339cf24d/mypy_boto3_sso_oidc-1.43.0-py3-none-any.whl", hash = "sha256:d94c482005009ecfeb624c61f658c74a0df47455294f421a8c93fa869da58c31", size = 19112, upload-time = "2026-04-29T23:06:26.673Z" },
 ]
 
 [[package]]

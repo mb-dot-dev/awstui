@@ -10,7 +10,7 @@ from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Input, Static
 from textual.worker import WorkerState
 
-from awst.aws.models import AwsError
+from awst.aws.models import AwsError, CredentialsError
 
 if TYPE_CHECKING:
     from rich.text import Text
@@ -33,6 +33,7 @@ class ResourceListScreen[ItemT](Screen[None]):
         ("escape", "back_or_clear", "Back"),
         ("r", "refresh", "Refresh"),
         ("slash", "focus_filter", "Filter"),
+        ("l", "login", "Login"),
     ]
 
     DEFAULT_CSS = """
@@ -44,6 +45,7 @@ class ResourceListScreen[ItemT](Screen[None]):
         super().__init__()
         self._all_items: list[ItemT] = []
         self._loaded = False
+        self._show_login = False
 
     def _list(self: Self) -> list[ItemT]:
         """Fetch every item from the gateway; called on a worker thread."""
@@ -64,6 +66,11 @@ class ResourceListScreen[ItemT](Screen[None]):
         yield Static(id="error")
         yield Footer()
 
+    def check_action(self: Self, action: str, parameters: tuple[object, ...]) -> bool | None:  # noqa: ARG002
+        if action == "login":
+            return self._show_login
+        return True
+
     def on_mount(self: Self) -> None:
         table = self.query_one("#items", DataTable)
         table.cursor_type = "row"
@@ -80,6 +87,8 @@ class ResourceListScreen[ItemT](Screen[None]):
         if event.worker.name != "_fetch_items":
             return
         if event.state == WorkerState.SUCCESS:
+            self._show_login = False
+            self.refresh_bindings()
             was_loaded = self._loaded
             self._loaded = True
             self._all_items = event.worker.result or []
@@ -96,6 +105,8 @@ class ResourceListScreen[ItemT](Screen[None]):
                 raise error
 
     def _show_error(self: Self, error: AwsError) -> None:
+        self._show_login = isinstance(error, CredentialsError) and bool(getattr(self.app, "sso_login_possible", False))
+        self.refresh_bindings()
         if self._loaded:
             message = error.message if error.hint is None else f"{error.message} ({error.hint})"
             self.notify(message, title="Refresh failed", severity="error")
@@ -108,8 +119,14 @@ class ResourceListScreen[ItemT](Screen[None]):
         self.query_one("#count", Static).display = False
         self.set_focus(None)
         panel = self.query_one("#error", Static)
-        panel.update(error.message if error.hint is None else f"{error.message}\n{error.hint}")
+        panel.update(self._error_text(error))
         panel.display = True
+
+    def _error_text(self: Self, error: AwsError) -> str:
+        text = error.message if error.hint is None else f"{error.message}\n{error.hint}"
+        if self._show_login:
+            text += "\nPress l to log in via AWS SSO."
+        return text
 
     def _render_rows(self: Self) -> None:
         table = self.query_one("#items", DataTable)
@@ -160,3 +177,13 @@ class ResourceListScreen[ItemT](Screen[None]):
             self.query_one("#items", DataTable).focus()
         else:
             self.app.pop_screen()
+
+    def action_login(self: Self) -> None:
+        factory = getattr(self.app, "make_sso_login_screen", None)
+        if factory is None:
+            return
+        self.app.push_screen(factory(), self._on_login_finished)
+
+    def _on_login_finished(self: Self, logged_in: bool | None) -> None:  # noqa: FBT001
+        if logged_in:
+            self.action_refresh()
