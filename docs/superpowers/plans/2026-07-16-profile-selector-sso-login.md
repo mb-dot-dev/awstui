@@ -1496,11 +1496,10 @@ def _activate_profile(monkeypatch: pytest.MonkeyPatch, config: str) -> None:
     monkeypatch.setenv("AWS_PROFILE", "dev")
 
 
-class BucketLoginApp(AwstApp):
-    """AwstApp variant that opens the bucket list directly."""
-
-    def on_mount(self: Self) -> None:
-        self.push_screen(BucketListScreen(self.s3_gateway))
+# Amended during execution: subclassing AwstApp to override on_mount does not work —
+# Textual dispatches on_mount from every class in the MRO, so AwstApp.on_mount still
+# runs and pushes HomeScreen. Tests instead use plain AwstApp and push
+# BucketListScreen(app.s3_gateway) from the test body after landing on HomeScreen.
 
 
 class PlainBucketApp(App[None]):
