@@ -1,7 +1,5 @@
 """CloudFormation stack detail screen."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, ClassVar, Protocol, Self
 
@@ -10,7 +8,7 @@ from textual import work
 from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static, TabbedContent, TabPane
-from textual.worker import WorkerState
+from textual.worker import Worker, WorkerState
 
 from awst.aws.models import AwsError, StackNotFoundError
 from awst.screens.confirm import ConfirmScreen
@@ -19,7 +17,6 @@ from awst.screens.formatting import relative_age, status_style
 if TYPE_CHECKING:
     from textual.app import ComposeResult
     from textual.binding import BindingType
-    from textual.worker import Worker
 
     from awst.aws.models import StackDetail
 

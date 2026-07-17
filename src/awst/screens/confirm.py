@@ -1,7 +1,5 @@
 """A reusable yes/no confirmation modal."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, ClassVar, Self
 
 from textual.containers import Horizontal, Vertical

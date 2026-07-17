@@ -1,7 +1,5 @@
 """AWS profile discovery, selection, and SSO config resolution."""
 
-from __future__ import annotations
-
 import os
 
 import boto3

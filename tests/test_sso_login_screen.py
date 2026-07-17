@@ -1,7 +1,5 @@
 """Tests for the SSO login modal."""
 
-from __future__ import annotations
-
 import contextlib
 from typing import TYPE_CHECKING, Self
 import webbrowser

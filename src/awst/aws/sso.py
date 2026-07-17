@@ -1,7 +1,5 @@
 """Gateway for the AWS SSO OIDC device-authorization login flow."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime, timedelta
 import hashlib
 import json

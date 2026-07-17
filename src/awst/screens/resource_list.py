@@ -1,14 +1,12 @@
 """Shared base for read-only, filterable AWS resource list screens."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, ClassVar, Self
 
 from textual import work
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Input, Static
-from textual.worker import WorkerState
+from textual.worker import Worker, WorkerState
 
 from awst.aws.models import AwsError, CredentialsError
 
@@ -16,7 +14,6 @@ if TYPE_CHECKING:
     from rich.text import Text
     from textual.app import ComposeResult
     from textual.binding import BindingType
-    from textual.worker import Worker
 
 
 class ResourceListScreen[ItemT](Screen[None]):

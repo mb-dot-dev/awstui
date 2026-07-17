@@ -1,7 +1,5 @@
 """Plain data models and errors for the AWS layer."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
