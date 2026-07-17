@@ -1,7 +1,5 @@
 """Gateway to the SQS API."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Self
 
 from botocore.exceptions import BotoCoreError, ClientError

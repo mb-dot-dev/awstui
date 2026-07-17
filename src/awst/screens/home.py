@@ -1,7 +1,5 @@
 """Home screen: pick an AWS service."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, Self, cast
 

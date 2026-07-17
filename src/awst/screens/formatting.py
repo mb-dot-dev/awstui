@@ -1,7 +1,5 @@
 """Pure formatting helpers for presenting AWS data."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

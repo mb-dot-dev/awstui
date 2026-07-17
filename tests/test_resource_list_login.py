@@ -1,7 +1,5 @@
 """Tests for the SSO login binding on resource list screens."""
 
-from __future__ import annotations
-
 import contextlib
 import os
 from pathlib import Path

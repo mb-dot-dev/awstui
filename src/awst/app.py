@@ -1,7 +1,5 @@
 """The awst Textual application."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Self
 
 import boto3

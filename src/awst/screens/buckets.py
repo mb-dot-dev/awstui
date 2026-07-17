@@ -1,7 +1,5 @@
 """S3 bucket list screen."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Protocol, Self
 
 from awst.aws.models import BucketSummary

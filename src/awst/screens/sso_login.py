@@ -1,7 +1,5 @@
 """Modal that walks the user through an AWS SSO device login."""
 
-from __future__ import annotations
-
 import contextlib
 from datetime import UTC, datetime
 import time
@@ -12,14 +10,13 @@ from textual import work
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Static
-from textual.worker import WorkerState, get_current_worker
+from textual.worker import Worker, WorkerState, get_current_worker
 
 from awst.aws.models import AwsError, DeviceAuthorization, SlowDownError, SsoToken
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
     from textual.binding import BindingType
-    from textual.worker import Worker
 
     from awst.aws.models import SsoConfig
 

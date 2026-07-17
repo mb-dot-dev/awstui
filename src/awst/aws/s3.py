@@ -1,7 +1,5 @@
 """Gateway to the S3 API."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Self
 
 from botocore.exceptions import BotoCoreError, ClientError

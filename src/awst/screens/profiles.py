@@ -1,7 +1,5 @@
 """Profile selection screen, shown at startup when no AWS profile is active."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, ClassVar, Self
 
 from textual.screen import Screen

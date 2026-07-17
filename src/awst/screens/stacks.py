@@ -1,10 +1,9 @@
 """CloudFormation stack list screen."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Protocol, Self
 
 from rich.text import Text
+from textual.widgets import DataTable  # noqa: TC002 -- needed at runtime: Textual inspects handler annotations
 
 from awst.aws.models import StackSummary
 from awst.screens.formatting import relative_age, status_style
@@ -13,8 +12,6 @@ from awst.screens.stack_detail import StackDetailScreen, StackInspector
 
 if TYPE_CHECKING:
     from datetime import datetime
-
-    from textual.widgets import DataTable
 
 
 class StackLister(Protocol):
