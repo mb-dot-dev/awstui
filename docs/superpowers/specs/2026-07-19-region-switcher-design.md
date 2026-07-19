@@ -30,8 +30,9 @@ Mirrors `profiles.py`:
 - `available_regions() -> list[str]` — sorted region names from botocore's
   bundled endpoint data (`boto3.Session().get_available_regions("ec2")`). No
   network call, no credentials needed, works before login.
-- `select_region(name: str) -> None` — sets `AWS_DEFAULT_REGION` process-wide.
-  Session-only; nothing is persisted to disk.
+- `select_region(name: str) -> None` — sets `AWS_DEFAULT_REGION` (which botocore
+  reads) and `AWS_REGION` (for subprocesses/tools with AWS CLI v2 semantics)
+  process-wide. Session-only; nothing is persisted to disk.
 
 ### App wiring — `AwstApp`
 

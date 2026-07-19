@@ -16,5 +16,10 @@ def available_regions() -> list[str]:
 
 
 def select_region(name: str) -> None:
-    """Make name the process-wide region; gateways rebuilt after reset_gateways pick it up."""
+    """Make name the process-wide region; gateways rebuilt after reset_gateways pick it up.
+
+    Botocore reads AWS_DEFAULT_REGION; AWS_REGION is set too so subprocesses and tools
+    with AWS CLI v2 semantics see the same choice.
+    """
     os.environ["AWS_DEFAULT_REGION"] = name
+    os.environ["AWS_REGION"] = name

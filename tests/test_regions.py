@@ -32,3 +32,4 @@ def test_select_region_sets_the_environment() -> None:
     regions.select_region("ap-southeast-2")
 
     assert os.environ["AWS_DEFAULT_REGION"] == "ap-southeast-2"
+    assert os.environ["AWS_REGION"] == "ap-southeast-2"
