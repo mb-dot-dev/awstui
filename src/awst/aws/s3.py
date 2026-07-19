@@ -42,23 +42,22 @@ class S3Gateway:
         """
         deleted = 0
         try:
+            # Re-list from the start after each batch instead of paginating with
+            # markers: resuming from a just-deleted key breaks under moto, and
+            # restarting is the standard pattern for delete-while-listing anyway.
+            # Each round deletes everything it listed (or raises), so the loop
+            # always makes progress.
             while True:
-                paginator = self._client.get_paginator("list_object_versions")
-                has_items = False
-                for page in paginator.paginate(Bucket=name, PaginationConfig={"PageSize": 1000}):
-                    items = [*page.get("Versions", []), *page.get("DeleteMarkers", [])]
-                    keys: list[ObjectIdentifierTypeDef] = [
-                        {"Key": item["Key"], "VersionId": item["VersionId"]} for item in items
-                    ]
-                    if not keys:
-                        continue
-                    has_items = True
-                    self._delete_batch(name, keys)
-                    deleted += len(keys)
-                    yield deleted
+                page = self._client.list_object_versions(Bucket=name, MaxKeys=1000)
+                items = [*page.get("Versions", []), *page.get("DeleteMarkers", [])]
+                if not items:
                     break
-                if not has_items:
-                    break
+                keys: list[ObjectIdentifierTypeDef] = [
+                    {"Key": item["Key"], "VersionId": item["VersionId"]} for item in items
+                ]
+                self._delete_batch(name, keys)
+                deleted += len(keys)
+                yield deleted
         except (BotoCoreError, ClientError) as error:
             raise map_botocore_error(error) from error
 
