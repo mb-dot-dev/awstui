@@ -84,7 +84,7 @@ class EmptyBucketScreen(ModalScreen[None]):
             self.notify(f"{self._count_text()} deleted.", title=f"Emptied {self._bucket_name}")
             self.dismiss(result=None)
         elif event.state == WorkerState.CANCELLED:
-            self.notify(f"{self._count_text()} were already deleted.", title="Cancelled", severity="warning")
+            self.notify(f"At least {self._count_text()} already deleted.", title="Cancelled", severity="warning")
             self.dismiss(result=None)
         elif event.state == WorkerState.ERROR:
             error = event.worker.error

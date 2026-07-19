@@ -176,6 +176,7 @@ Notes for the implementer:
 - `list_object_versions` returns both current/noncurrent versions and delete markers, and works identically on never-versioned buckets (each object appears as one version with `VersionId` `"null"`), so one code path covers all bucket states.
 - Pages cap at 1000 keys, which is exactly the `DeleteObjects` limit — no re-batching needed.
 - `AwsError` raised inside `_delete_batch` is not a botocore error, so it propagates through the `except` clause untouched.
+- (Amended during execution: this single-pass marker pagination fails under moto — resuming from a just-deleted key returns 0 items — so the shipped implementation lists the first page (`MaxKeys=1000`) in a restart loop instead; see `src/awst/aws/s3.py`.)
 
 - [ ] **Step 4: Run the tests to verify they pass**
 

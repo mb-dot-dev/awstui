@@ -5,8 +5,8 @@
 ## Goal
 
 Add the AWS console's "Empty bucket" capability to the S3 bucket list: permanently delete every
-object, object version, and delete marker in the selected bucket. This is the app's first
-destructive operation.
+object, object version, and delete marker in the selected bucket. This is the app's second
+destructive operation, after CloudFormation stack deletion.
 
 ## Decisions
 
@@ -34,7 +34,11 @@ input (standard Textual focus behavior), so typing "e" in the filter never trigg
 
 `S3Gateway.empty_bucket(name: str) -> Iterator[int]`:
 
-- Paginates `list_object_versions` (returns both versions and delete markers).
+- Repeatedly lists the first page of `list_object_versions` (`MaxKeys=1000`; returns both
+  versions and delete markers) and deletes it, restarting the listing after each batch —
+  marker-based resume from a just-deleted key breaks under moto, and restart is the standard
+  delete-while-listing pattern. (Amended during execution; the original design paginated with
+  markers.)
 - Calls `delete_objects` with up to 1000 keys per batch.
 - Yields the cumulative deleted count after each batch.
 - Maps botocore errors through the existing `map_botocore_error`.

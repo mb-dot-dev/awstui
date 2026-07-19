@@ -110,7 +110,7 @@ async def test_escape_cancels_and_reports_partial_count(toasts: list[str]) -> No
         gate.set()  # release the frozen worker thread so it can observe the cancel
         await _until_dismissed(app, pilot)
 
-    assert toasts == ["500 objects were already deleted."]
+    assert toasts == ["At least 500 objects already deleted."]
 
 
 @pytest.mark.asyncio
