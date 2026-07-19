@@ -1,29 +1,42 @@
 """S3 bucket list screen."""
 
-from typing import TYPE_CHECKING, Protocol, Self
+from functools import partial
+from typing import TYPE_CHECKING, ClassVar, Protocol, Self
+
+from textual.widgets import DataTable
 
 from awst.aws.models import BucketSummary
+from awst.screens.confirm import ConfirmScreen
+from awst.screens.empty_bucket import BucketEmptier, EmptyBucketScreen
 from awst.screens.formatting import relative_age
 from awst.screens.resource_list import ResourceListScreen
 
 if TYPE_CHECKING:
     from datetime import datetime
 
+    from textual.binding import BindingType
+
 
 class BucketLister(Protocol):
-    """The slice of the S3 gateway this screen needs."""
+    """The slice of the S3 gateway the list itself needs."""
 
     def list_buckets(self: Self) -> list[BucketSummary]: ...
 
 
+class BucketGateway(BucketLister, BucketEmptier, Protocol):
+    """Everything the bucket screens collectively need from S3."""
+
+
 class BucketListScreen(ResourceListScreen[BucketSummary]):
-    """Read-only list of the account's S3 buckets."""
+    """List of the account's S3 buckets; `e` empties the highlighted bucket."""
 
     TITLE = "S3 buckets"
     COLUMNS = ("Name", "Region", "Created")
     NOUN = "bucket"
 
-    def __init__(self: Self, gateway: BucketLister) -> None:
+    BINDINGS: ClassVar[list[BindingType]] = [("e", "empty", "Empty")]
+
+    def __init__(self: Self, gateway: BucketGateway) -> None:
         super().__init__()
         self._gateway = gateway
 
@@ -35,3 +48,18 @@ class BucketListScreen(ResourceListScreen[BucketSummary]):
 
     def _item_name(self: Self, item: BucketSummary) -> str:
         return item.name
+
+    def action_empty(self: Self) -> None:
+        name = self._cursor_name(self.query_one("#items", DataTable))
+        if name is None:
+            return
+        question = f"Permanently delete all objects, versions, and delete markers in {name}?"
+        self.app.push_screen(ConfirmScreen(question), partial(self._on_empty_confirmed, name))
+
+    def _on_empty_confirmed(self: Self, name: str, confirmed: bool | None) -> None:  # noqa: FBT001
+        if not confirmed:
+            return
+        self.app.push_screen(EmptyBucketScreen(self._gateway, name), self._on_empty_finished)
+
+    def _on_empty_finished(self: Self, result: None) -> None:  # noqa: ARG002
+        self.action_refresh()

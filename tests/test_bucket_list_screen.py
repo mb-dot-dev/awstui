@@ -1,14 +1,22 @@
 """Tests for the S3 bucket list screen."""
 
-from typing import Self
+import contextlib
+import threading
+from typing import TYPE_CHECKING, Self
 
 import pytest
 from textual.app import App
 from textual.widgets import DataTable, Input, Static
+from textual.worker import WorkerCancelled, WorkerFailed
 
 from awst.aws.models import AwsError
 from awst.screens.buckets import BucketListScreen
+from awst.screens.confirm import ConfirmScreen
+from awst.screens.empty_bucket import EmptyBucketScreen
 from tests.fakes import FakeS3Gateway, make_bucket
+
+if TYPE_CHECKING:
+    from textual.pilot import Pilot
 
 
 class BucketScreenApp(App[None]):
@@ -225,3 +233,87 @@ async def test_enter_on_row_does_nothing() -> None:
         await pilot.pause()
 
         assert isinstance(app.screen, BucketListScreen)  # no detail screen yet
+
+
+async def _until_back_on_list(app: App[None], pilot: Pilot[None]) -> None:
+    for _ in range(100):
+        with contextlib.suppress(WorkerFailed, WorkerCancelled):
+            await app.workers.wait_for_complete()
+        await pilot.pause()
+        if isinstance(app.screen, BucketListScreen):
+            return
+    pytest.fail("never returned to the bucket list")
+
+
+@pytest.mark.asyncio
+async def test_e_on_row_asks_for_confirmation_naming_the_bucket() -> None:
+    gateway = FakeS3Gateway(buckets=[make_bucket("assets")])
+    app = BucketScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("e")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ConfirmScreen)
+        assert "assets" in str(app.screen.query_one("#question", Static).content)
+        assert gateway.emptied == []  # nothing deleted yet
+
+
+@pytest.mark.asyncio
+async def test_e_with_no_rows_does_nothing() -> None:
+    app = BucketScreenApp(FakeS3Gateway(buckets=[]))
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("e")
+        await pilot.pause()
+
+        assert isinstance(app.screen, BucketListScreen)
+
+
+@pytest.mark.asyncio
+async def test_declining_confirmation_deletes_nothing() -> None:
+    gateway = FakeS3Gateway(buckets=[make_bucket("assets")])
+    app = BucketScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("e")
+        await pilot.pause()
+        await pilot.press("n")
+        await pilot.pause()
+
+        assert isinstance(app.screen, BucketListScreen)
+        assert gateway.emptied == []
+        assert gateway.calls == 1  # no refresh either
+
+
+@pytest.mark.asyncio
+async def test_confirming_empties_the_bucket_and_refreshes() -> None:
+    gate = threading.Event()
+    gateway = FakeS3Gateway(buckets=[make_bucket("assets")], empty_batches=[1, 2], empty_gate=gate)
+    app = BucketScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("e")
+        await pilot.pause()
+        await pilot.press("y")
+        await pilot.pause()
+
+        assert isinstance(app.screen, EmptyBucketScreen)  # gate holds the worker before its second batch
+
+        gate.set()
+        await _until_back_on_list(app, pilot)
+
+        assert gateway.emptied == ["assets"]
+        assert gateway.calls == 2  # the list refreshed after emptying
