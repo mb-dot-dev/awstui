@@ -7,6 +7,8 @@ from awst.aws.models import (
     BucketSummary,
     DeviceAuthorization,
     FunctionSummary,
+    ObjectPage,
+    ObjectSummary,
     QueueSummary,
     SsoConfig,
     SsoToken,
@@ -123,22 +125,34 @@ def make_bucket(name: str, region: str = "eu-west-1") -> BucketSummary:
     return BucketSummary(name=name, region=region, created=_CREATED)
 
 
+def make_object(key: str, size: int = 2048) -> ObjectSummary:
+    """An object summary with sensible defaults for list-screen tests."""
+    return ObjectSummary(key=key, size=size, modified=_CREATED)
+
+
 class FakeS3Gateway:
     """In-memory stand-in for the real S3 gateway."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self: Self,
         buckets: list[BucketSummary] | None = None,
         error: AwsError | None = None,
         empty_batches: list[int] | None = None,
         empty_error: AwsError | None = None,
         empty_gate: threading.Event | None = None,
+        object_pages: dict[tuple[str, str | None], ObjectPage] | None = None,
+        objects_error: AwsError | None = None,
+        objects_gate: threading.Event | None = None,
     ) -> None:
         self.buckets = buckets or []
         self.error = error
         self.empty_batches = empty_batches or []
         self.empty_error = empty_error
         self.empty_gate = empty_gate
+        self.object_pages = object_pages or {}
+        self.objects_error = objects_error
+        self.objects_gate = objects_gate
+        self.object_calls: list[tuple[str, str, str, str | None]] = []
         self.calls = 0
         self.emptied: list[str] = []
 
@@ -147,6 +161,21 @@ class FakeS3Gateway:
         if self.error is not None:
             raise self.error
         return list(self.buckets)
+
+    def list_objects(
+        self: Self,
+        bucket: str,
+        region: str,
+        prefix: str = "",
+        continuation_token: str | None = None,
+    ) -> ObjectPage:
+        self.object_calls.append((bucket, region, prefix, continuation_token))
+        if self.objects_error is not None:
+            raise self.objects_error
+        if continuation_token is not None and self.objects_gate is not None:
+            self.objects_gate.wait(timeout=5)  # lets tests freeze a load-more mid-flight
+        empty = ObjectPage(folders=(), objects=(), continuation_token=None)
+        return self.object_pages.get((prefix, continuation_token), empty)
 
     def empty_bucket(self: Self, name: str) -> Iterator[int]:
         self.emptied.append(name)
