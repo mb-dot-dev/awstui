@@ -531,6 +531,7 @@ Claude-Session: https://claude.ai/code/session_01KQYXe2X8MJcasFZJUt5qJB"
 
 **Files:**
 - Modify: `src/awst/screens/buckets.py`
+- Modify: `src/awst/app.py` (widen `s3_gateway`'s declared type from `BucketLister` to `BucketGateway` — required for `ty` once `BucketListScreen` demands the wider protocol)
 - Test: `tests/test_bucket_list_screen.py`
 
 **Interfaces:**
@@ -604,7 +605,8 @@ async def test_declining_confirmation_deletes_nothing() -> None:
 
 @pytest.mark.asyncio
 async def test_confirming_empties_the_bucket_and_refreshes() -> None:
-    gateway = FakeS3Gateway(buckets=[make_bucket("assets")], empty_batches=[2])
+    gate = threading.Event()
+    gateway = FakeS3Gateway(buckets=[make_bucket("assets")], empty_batches=[1, 2], empty_gate=gate)
     app = BucketScreenApp(gateway)
 
     async with app.run_test() as pilot:
@@ -616,13 +618,16 @@ async def test_confirming_empties_the_bucket_and_refreshes() -> None:
         await pilot.press("y")
         await pilot.pause()
 
-        assert isinstance(app.screen, EmptyBucketScreen)
+        assert isinstance(app.screen, EmptyBucketScreen)  # gate holds the worker before its second batch
 
+        gate.set()
         await _until_back_on_list(app, pilot)
 
         assert gateway.emptied == ["assets"]
         assert gateway.calls == 2  # the list refreshed after emptying
 ```
+
+(Amended during execution: the original single-batch, ungated version raced — the whole confirm→empty→dismiss→refresh chain could complete inside `pilot.press("y")`, so the `EmptyBucketScreen` assertion was nondeterministic. The gate pins the modal open, matching Task 2's test pattern. Requires `import threading` in the test file's imports.)
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
