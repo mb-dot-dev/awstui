@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 _MINUTE = 60
 _HOUR = 3600
 _DAY = 86400
+_KIB = 1024
 
 
 def relative_age(moment: datetime, now: datetime) -> str:
@@ -31,3 +32,15 @@ def status_style(status: str) -> str:
     if status.endswith("_COMPLETE"):
         return "green"
     return ""
+
+
+def human_size(size: int) -> str:
+    """Render a byte count for humans, e.g. "1.5 KB"."""
+    if size < _KIB:
+        return f"{size} B"
+    value = float(size)
+    for unit in ("KB", "MB", "GB", "TB"):
+        value /= _KIB
+        if value < _KIB:
+            return f"{value:.1f} {unit}"
+    return f"{value / _KIB:.1f} PB"

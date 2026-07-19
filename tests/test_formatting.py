@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from awst.screens.formatting import relative_age, status_style
+from awst.screens.formatting import human_size, relative_age, status_style
 
 NOW = datetime(2026, 7, 4, 12, 0, tzinfo=UTC)
 
@@ -37,3 +37,21 @@ def test_relative_age(age: timedelta, expected: str) -> None:
 )
 def test_status_style(status: str, expected: str) -> None:
     assert status_style(status) == expected
+
+
+@pytest.mark.parametrize(
+    ("size", "expected"),
+    [
+        (0, "0 B"),
+        (512, "512 B"),
+        (1023, "1023 B"),
+        (1024, "1.0 KB"),
+        (1536, "1.5 KB"),
+        (1048576, "1.0 MB"),
+        (5 * 1024**3, "5.0 GB"),
+        (2 * 1024**4, "2.0 TB"),
+        (1024**5, "1.0 PB"),
+    ],
+)
+def test_human_size(size: int, expected: str) -> None:
+    assert human_size(size) == expected
