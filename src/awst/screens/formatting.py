@@ -39,8 +39,8 @@ def human_size(size: int) -> str:
     if size < _KIB:
         return f"{size} B"
     value = float(size)
-    for unit in ("KB", "MB", "GB", "TB"):
+    for unit in ("KB", "MB", "GB", "TB", "PB"):
         value /= _KIB
-        if value < _KIB:
+        if round(value, 1) < _KIB or unit == "PB":
             return f"{value:.1f} {unit}"
     return f"{value / _KIB:.1f} PB"

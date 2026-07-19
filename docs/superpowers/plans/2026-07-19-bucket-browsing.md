@@ -307,7 +307,9 @@ Append to `tests/test_formatting.py`, and add `human_size` to the existing impor
         (1023, "1023 B"),
         (1024, "1.0 KB"),
         (1536, "1.5 KB"),
+        (1048575, "1.0 MB"),
         (1048576, "1.0 MB"),
+        (1073741823, "1.0 GB"),
         (5 * 1024**3, "5.0 GB"),
         (2 * 1024**4, "2.0 TB"),
         (1024**5, "1.0 PB"),
@@ -335,9 +337,9 @@ def human_size(size: int) -> str:
     if size < _KIB:
         return f"{size} B"
     value = float(size)
-    for unit in ("KB", "MB", "GB", "TB"):
+    for unit in ("KB", "MB", "GB", "TB", "PB"):
         value /= _KIB
-        if value < _KIB:
+        if round(value, 1) < _KIB or unit == "PB":
             return f"{value:.1f} {unit}"
     return f"{value / _KIB:.1f} PB"
 ```
