@@ -1,11 +1,11 @@
 """The awst Textual application."""
 
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
 import boto3
 from textual.app import App
 
-from awst.aws import profiles
+from awst.aws import profiles, regions
 from awst.aws.cloudformation import CloudFormationGateway
 from awst.aws.lambda_ import LambdaGateway
 from awst.aws.s3 import S3Gateway
@@ -13,10 +13,13 @@ from awst.aws.sqs import SqsGateway
 from awst.aws.sso import SsoLoginGateway
 from awst.screens.home import HomeScreen
 from awst.screens.profiles import ProfileSelectScreen
+from awst.screens.regions import RegionSelectScreen
 from awst.screens.sso_login import SsoLoginScreen
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from textual.binding import BindingType
 
     from awst.aws.models import SsoConfig
     from awst.screens.buckets import BucketGateway
@@ -28,6 +31,8 @@ if TYPE_CHECKING:
 
 class AwstApp(App[None]):
     """AWS console terminal UI."""
+
+    BINDINGS: ClassVar[list[BindingType]] = [("ctrl+g", "switch_region", "Region")]
 
     def __init__(
         self: Self,
@@ -76,6 +81,13 @@ class AwstApp(App[None]):
             self._sqs_gateway = SqsGateway(session.client("sqs"))
         return self._sqs_gateway
 
+    def reset_gateways(self: Self) -> None:
+        """Drop the cached gateways so the next use rebuilds them from the current environment."""
+        self._cloudformation_gateway = None
+        self._s3_gateway = None
+        self._lambda_gateway = None
+        self._sqs_gateway = None
+
     @property
     def sso_login_possible(self: Self) -> bool:
         """Whether the active profile has SSO settings to log in with."""
@@ -94,9 +106,8 @@ class AwstApp(App[None]):
         return SsoLoginScreen(SsoLoginGateway(client), config)
 
     def on_mount(self: Self) -> None:
-        profile = profiles.active_profile()
-        if profile is not None:
-            self.sub_title = profile
+        self._refresh_sub_title()
+        if profiles.active_profile() is not None:
             self.push_screen(HomeScreen())
             return
         names = profiles.available_profiles()
@@ -108,5 +119,29 @@ class AwstApp(App[None]):
     def _on_profile_selected(self: Self, name: str | None) -> None:
         if name is not None:
             profiles.select_profile(name)
-            self.sub_title = name
+            self._refresh_sub_title()
         self.push_screen(HomeScreen())
+
+    def _refresh_sub_title(self: Self) -> None:
+        parts = [part for part in (profiles.active_profile(), regions.active_region()) if part]
+        self.sub_title = " @ ".join(parts)
+
+    def check_action(self: Self, action: str, parameters: tuple[object, ...]) -> bool | None:  # noqa: ARG002
+        if action == "switch_region":
+            return any(isinstance(screen, HomeScreen) for screen in self.screen_stack)
+        return True
+
+    def action_switch_region(self: Self) -> None:
+        if isinstance(self.screen, RegionSelectScreen):
+            return
+        picker = RegionSelectScreen(regions.available_regions(), regions.active_region())
+        self.push_screen(picker, self._on_region_selected)
+
+    def _on_region_selected(self: Self, name: str | None) -> None:
+        if name is None:
+            return
+        regions.select_region(name)
+        self.reset_gateways()
+        while not isinstance(self.screen, HomeScreen):
+            self.pop_screen()
+        self._refresh_sub_title()

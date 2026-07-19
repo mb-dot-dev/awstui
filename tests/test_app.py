@@ -1,13 +1,19 @@
 """Tests for the app shell and home-screen navigation."""
 
+import os
+from pathlib import Path
+
 import pytest
 from textual.widgets import DataTable, OptionList
 
 from awst.app import AwstApp
+from awst.aws import regions
 from awst.screens.buckets import BucketListScreen
 from awst.screens.functions import FunctionListScreen
 from awst.screens.home import HomeScreen
+from awst.screens.profiles import ProfileSelectScreen
 from awst.screens.queues import QueueListScreen
+from awst.screens.regions import RegionSelectScreen
 from awst.screens.stack_detail import StackDetailScreen
 from awst.screens.stacks import StackListScreen
 from tests.fakes import (
@@ -163,3 +169,81 @@ async def test_q_quits_from_home() -> None:
         await pilot.pause()
 
     assert app.return_code == 0
+
+
+@pytest.mark.asyncio
+async def test_ctrl_g_opens_the_region_picker_from_home() -> None:
+    app = AwstApp(cloudformation_gateway=FakeCloudFormationGateway())
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+g")
+        await pilot.pause()
+
+        assert isinstance(app.screen, RegionSelectScreen)
+
+
+@pytest.mark.asyncio
+async def test_switching_region_from_a_list_screen_returns_home() -> None:
+    gateway = FakeCloudFormationGateway(stacks=[make_stack("prod-api")])
+    app = AwstApp(cloudformation_gateway=gateway)
+    names = regions.available_regions()
+    target = names[names.index("eu-west-1") + 1]  # the region one below the preselected one
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert isinstance(app.screen, StackListScreen)
+
+        await pilot.press("ctrl+g")
+        await pilot.pause()
+        await pilot.press("down")
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, HomeScreen)
+        assert os.environ["AWS_DEFAULT_REGION"] == target
+        assert app.sub_title == target
+
+
+@pytest.mark.asyncio
+async def test_escape_closes_the_region_picker_without_change() -> None:
+    app = AwstApp(cloudformation_gateway=FakeCloudFormationGateway())
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+g")
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert isinstance(app.screen, HomeScreen)
+        assert os.environ["AWS_DEFAULT_REGION"] == "eu-west-1"
+
+
+def _write_single_profile_config() -> None:
+    Path(os.environ["AWS_CONFIG_FILE"]).write_text("[profile dev]\nregion = eu-west-1\n")
+
+
+@pytest.mark.asyncio
+async def test_region_picker_is_unavailable_on_the_startup_profile_picker() -> None:
+    _write_single_profile_config()
+    app = AwstApp(cloudformation_gateway=FakeCloudFormationGateway())
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+g")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ProfileSelectScreen)
+
+
+def test_reset_gateways_rebuilds_on_next_access() -> None:
+    app = AwstApp()
+
+    first = app.s3_gateway
+    app.reset_gateways()
+
+    assert app.s3_gateway is not first
