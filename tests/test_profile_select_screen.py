@@ -51,7 +51,7 @@ async def test_selecting_a_profile_sets_it_and_opens_home() -> None:
 
         assert os.environ["AWS_PROFILE"] == "dev"
         assert isinstance(app.screen, HomeScreen)
-        assert app.sub_title == "dev"
+        assert app.sub_title == "dev @ eu-west-1"
 
 
 @pytest.mark.asyncio
@@ -64,7 +64,7 @@ async def test_picker_skipped_when_profile_env_is_set(monkeypatch: pytest.Monkey
         await pilot.pause()
 
         assert isinstance(app.screen, HomeScreen)
-        assert app.sub_title == "prod"
+        assert app.sub_title == "prod @ eu-west-1"
 
 
 @pytest.mark.asyncio
@@ -75,6 +75,7 @@ async def test_picker_skipped_when_no_profiles_exist() -> None:
         await pilot.pause()
 
         assert isinstance(app.screen, HomeScreen)
+        assert app.sub_title == "eu-west-1"
 
 
 @pytest.mark.asyncio
