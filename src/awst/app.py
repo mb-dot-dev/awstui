@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from awst.aws.models import SsoConfig
-    from awst.screens.buckets import BucketLister
+    from awst.screens.buckets import BucketGateway
     from awst.screens.functions import FunctionLister
     from awst.screens.queues import QueueLister
     from awst.screens.sso_login import SsoAuthorizer
@@ -32,7 +32,7 @@ class AwstApp(App[None]):
     def __init__(
         self: Self,
         cloudformation_gateway: StackGateway | None = None,
-        s3_gateway: BucketLister | None = None,
+        s3_gateway: BucketGateway | None = None,
         lambda_gateway: FunctionLister | None = None,
         sqs_gateway: QueueLister | None = None,
         sso_gateway_factory: Callable[[SsoConfig], SsoAuthorizer] | None = None,
@@ -53,7 +53,7 @@ class AwstApp(App[None]):
         return self._cloudformation_gateway
 
     @property
-    def s3_gateway(self: Self) -> BucketLister:
+    def s3_gateway(self: Self) -> BucketGateway:
         """The S3 gateway, built on first use from the default credential chain."""
         if self._s3_gateway is None:
             session = boto3.Session()
