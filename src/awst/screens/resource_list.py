@@ -31,6 +31,7 @@ class ResourceListScreen[ItemT](Screen[None]):
         ("r", "refresh", "Refresh"),
         ("slash", "focus_filter", "Filter"),
         ("l", "login", "Login"),
+        ("m", "load_more", "More"),
     ]
 
     DEFAULT_CSS = """
@@ -56,6 +57,14 @@ class ResourceListScreen[ItemT](Screen[None]):
         """The item's unique name, used as the row key and filter target."""
         raise NotImplementedError
 
+    def _has_more(self: Self) -> bool:
+        """Whether _list_more can fetch another page; paged subclasses override both."""
+        return False
+
+    def _list_more(self: Self) -> list[ItemT]:
+        """Fetch the next page; called on a worker thread, only when _has_more() is true."""
+        raise NotImplementedError
+
     def compose(self: Self) -> ComposeResult:
         yield Static(id="count")
         yield Input(placeholder=f"filter {self.NOUN}s by name", id="filter")
@@ -66,6 +75,8 @@ class ResourceListScreen[ItemT](Screen[None]):
     def check_action(self: Self, action: str, parameters: tuple[object, ...]) -> bool | None:  # noqa: ARG002
         if action == "login":
             return self._show_login
+        if action == "load_more":
+            return self._has_more()
         return True
 
     def on_mount(self: Self) -> None:
@@ -80,15 +91,29 @@ class ResourceListScreen[ItemT](Screen[None]):
     def _fetch_items(self: Self) -> list[ItemT]:
         return self._list()
 
+    @work(thread=True, exclusive=True, exit_on_error=False)
+    def _fetch_more(self: Self) -> list[ItemT]:
+        return self._list_more()
+
+    def action_load_more(self: Self) -> None:
+        if not self._has_more():
+            return
+        self.query_one("#count", Static).update("loading more…")
+        self._fetch_more()
+
     def on_worker_state_changed(self: Self, event: Worker.StateChanged) -> None:
-        if event.worker.name != "_fetch_items":
+        if event.worker.name not in {"_fetch_items", "_fetch_more"}:
             return
         if event.state == WorkerState.SUCCESS:
             self._show_login = False
-            self.refresh_bindings()
             was_loaded = self._loaded
             self._loaded = True
-            self._all_items = event.worker.result or []
+            result = event.worker.result or []
+            if event.worker.name == "_fetch_more":
+                self._all_items = [*self._all_items, *result]
+            else:
+                self._all_items = result
+            self.refresh_bindings()
             table = self.query_one("#items", DataTable)
             table.loading = False
             self._render_rows()
@@ -139,7 +164,8 @@ class ResourceListScreen[ItemT](Screen[None]):
             table.move_cursor(row=names.index(previous))
         total = len(self._all_items)
         noun = self.NOUN if total == 1 else f"{self.NOUN}s"
-        count = f"{len(visible)} of {total} {noun}" if query else f"{total} {noun}"
+        suffix = "+" if self._has_more() else ""
+        count = f"{len(visible)} of {total}{suffix} {noun}" if query else f"{total}{suffix} {noun}"
         self.query_one("#count", Static).update(count)
 
     def _cursor_name(self: Self, table: DataTable) -> str | None:
