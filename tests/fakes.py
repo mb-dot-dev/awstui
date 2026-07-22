@@ -238,16 +238,26 @@ def make_queue(name: str) -> QueueSummary:
 class FakeSqsGateway:
     """In-memory stand-in for the real SQS gateway."""
 
-    def __init__(self: Self, queues: list[QueueSummary] | None = None, error: AwsError | None = None) -> None:
+    def __init__(
+        self: Self,
+        queues: list[QueueSummary] | None = None,
+        error: AwsError | None = None,
+        pages: dict[str | None, Page[QueueSummary]] | None = None,
+    ) -> None:
         self.queues = queues or []
         self.error = error
+        self.pages = pages
         self.calls = 0
+        self.next_tokens: list[str | None] = []
 
-    def list_queues(self: Self) -> list[QueueSummary]:
+    def list_queues(self: Self, next_token: str | None = None) -> Page[QueueSummary]:
         self.calls += 1
+        self.next_tokens.append(next_token)
         if self.error is not None:
             raise self.error
-        return list(self.queues)
+        if self.pages is not None:
+            return self.pages.get(next_token, Page(items=(), next_token=None))
+        return Page(items=tuple(self.queues), next_token=None)
 
 
 class FakeSsoLoginGateway:
