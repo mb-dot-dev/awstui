@@ -1,12 +1,14 @@
 """Tests for the load-more support in ResourceListScreen."""
 
+import contextlib
 from datetime import datetime  # noqa: TC003
 import threading
 from typing import TYPE_CHECKING, Self
 
 import pytest
 from textual.app import App
-from textual.widgets import DataTable, Static
+from textual.widgets import DataTable, Input, Static
+from textual.worker import WorkerCancelled, WorkerFailed
 
 from awst.aws.models import AwsError
 from awst.screens.resource_list import ResourceListScreen
@@ -316,3 +318,58 @@ async def test_count_shows_searching_while_fetching_remaining_pages() -> None:
         gate.set()
         await _settle(app)
         await pilot.pause()
+
+
+@pytest.mark.asyncio
+async def test_fetch_remaining_stops_when_cancelled_mid_loop() -> None:
+    gate = threading.Event()
+    started = threading.Event()
+    # 5 pages: enough remaining pages that, pre-fix, the zombie loop would keep calling
+    # _list_more() for every one of them instead of stopping after the first.
+    app = PagedApp([["a"], ["b"], ["c"], ["d"], ["e"]], gate=gate, started=started)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, PagedScreen)
+
+        await pilot.press("slash")
+        await pilot.press(*"a")  # non-empty filter triggers _fetch_remaining (4 remaining pages)
+        assert started.wait(timeout=5)  # thread is blocked inside the first _list_more call (fetching "b")
+        await pilot.pause()
+
+        # Clear the filter before refreshing: _on_fetch_success() always calls _maybe_fetch_remaining()
+        # after a successful fetch, and the CANCELLED worker-state handler clears _loading_more as
+        # soon as cancellation is noticed (see its docstring) -- well before the zombie thread below
+        # actually exits. With the filter still set, the refresh's own fresh load would legitimately
+        # kick off a *second* _fetch_remaining worker, confounding more_calls with a second, unrelated
+        # instance of this fake's own unguarded page counter. Clearing it isolates just the zombie's
+        # own cancellation-check behavior, which is what this test targets.
+        screen.query_one("#filter", Input).value = ""
+        # Starts _fetch_items, which cancels the in-flight _fetch_remaining (same exclusive group).
+        screen.action_refresh()
+        await pilot.pause()
+
+        gate.set()  # release the blocked _list_more call; it returns "b" and the loop re-checks _has_more()
+        with contextlib.suppress(WorkerCancelled, WorkerFailed):
+            await app.workers.wait_for_complete()
+        await pilot.pause()
+
+        # Pre-fix this is 4 (the zombie loops through every remaining page once cancelled, ignoring
+        # it); post-fix it's 1 (the loop notices cancellation and breaks after the in-flight call).
+        assert screen.more_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_sort_applies_on_the_fresh_load_path() -> None:
+    app = PagedApp([["banana", "apple"]], sort=True)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+        table = app.screen.query_one(DataTable)
+
+        assert table.row_count == 2
+        assert table.get_row_at(0)[0] == "apple"
+        assert table.get_row_at(1)[0] == "banana"

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Self
 from textual import work
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Input, Static
-from textual.worker import Worker, WorkerState
+from textual.worker import Worker, WorkerState, get_current_worker
 
 from awst.aws.models import AwsError, CredentialsError
 
@@ -110,6 +110,8 @@ class ResourceListScreen[ItemT](Screen[None]):
     def _fetch_remaining(self: Self) -> list[ItemT]:
         items: list[ItemT] = []
         while self._has_more():
+            if get_current_worker().is_cancelled:
+                break
             items.extend(self._list_more())
         return items
 
