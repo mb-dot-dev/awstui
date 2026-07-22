@@ -7,6 +7,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from awst.aws.errors import map_botocore_error
 from awst.aws.models import (
     AwsError,
+    Page,
     StackDetail,
     StackEvent,
     StackNotFoundError,
@@ -35,17 +36,20 @@ class CloudFormationGateway:
     def __init__(self: Self, client: CloudFormationClient) -> None:
         self._client = client
 
-    def list_stacks(self: Self) -> list[StackSummary]:
-        """Return every stack in the account/region, sorted by name.
+    def list_stacks(self: Self, next_token: str | None = None) -> Page[StackSummary]:
+        """Return one page of stacks in the account/region.
 
         Raises AwsError for any credential, network, or API failure.
         """
         try:
-            paginator = self._client.get_paginator("describe_stacks")
-            stacks = [_to_summary(stack) for page in paginator.paginate() for stack in page["Stacks"]]
+            if next_token is None:
+                response = self._client.describe_stacks()
+            else:
+                response = self._client.describe_stacks(NextToken=next_token)
         except (BotoCoreError, ClientError) as error:
             raise map_botocore_error(error) from error
-        return sorted(stacks, key=lambda stack: stack.name)
+        stacks = tuple(_to_summary(stack) for stack in response["Stacks"])
+        return Page(items=stacks, next_token=response.get("NextToken"))
 
     def get_stack_detail(self: Self, name: str) -> StackDetail:
         """Return one stack's overview, parameters, outputs, resources, and recent events.

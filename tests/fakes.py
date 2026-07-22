@@ -9,6 +9,7 @@ from awst.aws.models import (
     FunctionSummary,
     ObjectPage,
     ObjectSummary,
+    Page,
     QueueSummary,
     SsoConfig,
     SsoToken,
@@ -82,28 +83,34 @@ def make_detail(
 class FakeCloudFormationGateway:
     """In-memory stand-in for the real CloudFormation gateway."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self: Self,
         stacks: list[StackSummary] | None = None,
         error: AwsError | None = None,
         detail: StackDetail | None = None,
         detail_error: AwsError | None = None,
         delete_error: AwsError | None = None,
+        pages: dict[str | None, Page[StackSummary]] | None = None,
     ) -> None:
         self.stacks = stacks or []
         self.error = error
         self.detail = detail
         self.detail_error = detail_error
         self.delete_error = delete_error
+        self.pages = pages
         self.calls = 0
+        self.next_tokens: list[str | None] = []
         self.detail_calls: list[str] = []
         self.deleted: list[str] = []
 
-    def list_stacks(self: Self) -> list[StackSummary]:
+    def list_stacks(self: Self, next_token: str | None = None) -> Page[StackSummary]:
         self.calls += 1
+        self.next_tokens.append(next_token)
         if self.error is not None:
             raise self.error
-        return list(self.stacks)
+        if self.pages is not None:
+            return self.pages.get(next_token, Page(items=(), next_token=None))
+        return Page(items=tuple(self.stacks), next_token=None)
 
     def get_stack_detail(self: Self, name: str) -> StackDetail:
         self.detail_calls.append(name)
