@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Self
 from botocore.exceptions import BotoCoreError, ClientError
 
 from awst.aws.errors import map_botocore_error
-from awst.aws.models import QueueSummary
+from awst.aws.models import Page, QueueSummary
 
 if TYPE_CHECKING:
     from mypy_boto3_sqs import SQSClient
@@ -17,17 +17,20 @@ class SqsGateway:
     def __init__(self: Self, client: SQSClient) -> None:
         self._client = client
 
-    def list_queues(self: Self) -> list[QueueSummary]:
-        """Return every queue in the region, sorted by name.
+    def list_queues(self: Self, next_token: str | None = None) -> Page[QueueSummary]:
+        """Return one page of queues in the region.
 
         Raises AwsError for any credential, network, or API failure.
         """
         try:
-            paginator = self._client.get_paginator("list_queues")
-            queues = [_to_summary(url) for page in paginator.paginate() for url in page.get("QueueUrls", [])]
+            if next_token is None:
+                response = self._client.list_queues()
+            else:
+                response = self._client.list_queues(NextToken=next_token)
         except (BotoCoreError, ClientError) as error:
             raise map_botocore_error(error) from error
-        return sorted(queues, key=lambda queue: queue.name)
+        queues = tuple(_to_summary(url) for url in response.get("QueueUrls", []))
+        return Page(items=queues, next_token=response.get("NextToken"))
 
 
 def _to_summary(queue_url: str) -> QueueSummary:

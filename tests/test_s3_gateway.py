@@ -21,20 +21,21 @@ def _create_bucket(name: str) -> None:
 
 
 @mock_aws
-def test_list_buckets_returns_all_buckets_sorted_by_name() -> None:
+def test_list_buckets_returns_buckets_in_api_order_unsorted() -> None:
     for name in ("gamma", "alpha", "beta"):
         _create_bucket(name)
 
-    buckets = _gateway().list_buckets()
+    page = _gateway().list_buckets()
 
-    assert [bucket.name for bucket in buckets] == ["alpha", "beta", "gamma"]
+    assert [bucket.name for bucket in page.items] == ["gamma", "alpha", "beta"]
+    assert page.next_token is None
 
 
 @mock_aws
 def test_list_buckets_maps_fields() -> None:
     _create_bucket("alpha")
 
-    bucket = _gateway().list_buckets()[0]
+    bucket = _gateway().list_buckets().items[0]
 
     assert bucket.name == "alpha"
     assert bucket.created.tzinfo is not None
@@ -42,7 +43,26 @@ def test_list_buckets_maps_fields() -> None:
 
 @mock_aws
 def test_list_buckets_returns_empty_list_for_empty_account() -> None:
-    assert _gateway().list_buckets() == []
+    assert _gateway().list_buckets().items == ()
+
+
+def test_list_buckets_forwards_continuation_token() -> None:
+    client = boto3.client("s3", region_name="eu-west-1")
+    created = datetime(2026, 1, 1, tzinfo=UTC)
+    with Stubber(client) as stubber:
+        stubber.add_response(
+            "list_buckets", {"Buckets": [{"Name": "alpha", "CreationDate": created}], "ContinuationToken": "t1"}, {}
+        )
+        stubber.add_response(
+            "list_buckets", {"Buckets": [{"Name": "beta", "CreationDate": created}]}, {"ContinuationToken": "t1"}
+        )
+
+        first = S3Gateway(client).list_buckets()
+        second = S3Gateway(client).list_buckets(first.next_token)
+
+    assert first.next_token == "t1"
+    assert [bucket.name for bucket in second.items] == ["beta"]
+    assert second.next_token is None
 
 
 def test_to_summary_maps_bucket_region_when_present() -> None:

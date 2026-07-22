@@ -9,6 +9,7 @@ from awst.aws.models import (
     FunctionSummary,
     ObjectPage,
     ObjectSummary,
+    Page,
     QueueSummary,
     SsoConfig,
     SsoToken,
@@ -82,28 +83,34 @@ def make_detail(
 class FakeCloudFormationGateway:
     """In-memory stand-in for the real CloudFormation gateway."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self: Self,
         stacks: list[StackSummary] | None = None,
         error: AwsError | None = None,
         detail: StackDetail | None = None,
         detail_error: AwsError | None = None,
         delete_error: AwsError | None = None,
+        pages: dict[str | None, Page[StackSummary]] | None = None,
     ) -> None:
         self.stacks = stacks or []
         self.error = error
         self.detail = detail
         self.detail_error = detail_error
         self.delete_error = delete_error
+        self.pages = pages
         self.calls = 0
+        self.next_tokens: list[str | None] = []
         self.detail_calls: list[str] = []
         self.deleted: list[str] = []
 
-    def list_stacks(self: Self) -> list[StackSummary]:
+    def list_stacks(self: Self, next_token: str | None = None) -> Page[StackSummary]:
         self.calls += 1
+        self.next_tokens.append(next_token)
         if self.error is not None:
             raise self.error
-        return list(self.stacks)
+        if self.pages is not None:
+            return self.pages.get(next_token, Page(items=(), next_token=None))
+        return Page(items=tuple(self.stacks), next_token=None)
 
     def get_stack_detail(self: Self, name: str) -> StackDetail:
         self.detail_calls.append(name)
@@ -137,6 +144,7 @@ class FakeS3Gateway:
         self: Self,
         buckets: list[BucketSummary] | None = None,
         error: AwsError | None = None,
+        bucket_pages: dict[str | None, Page[BucketSummary]] | None = None,
         empty_batches: list[int] | None = None,
         empty_error: AwsError | None = None,
         empty_gate: threading.Event | None = None,
@@ -146,6 +154,7 @@ class FakeS3Gateway:
     ) -> None:
         self.buckets = buckets or []
         self.error = error
+        self.bucket_pages = bucket_pages
         self.empty_batches = empty_batches or []
         self.empty_error = empty_error
         self.empty_gate = empty_gate
@@ -154,13 +163,17 @@ class FakeS3Gateway:
         self.objects_gate = objects_gate
         self.object_calls: list[tuple[str, str, str, str | None]] = []
         self.calls = 0
+        self.next_tokens: list[str | None] = []
         self.emptied: list[str] = []
 
-    def list_buckets(self: Self) -> list[BucketSummary]:
+    def list_buckets(self: Self, next_token: str | None = None) -> Page[BucketSummary]:
         self.calls += 1
+        self.next_tokens.append(next_token)
         if self.error is not None:
             raise self.error
-        return list(self.buckets)
+        if self.bucket_pages is not None:
+            return self.bucket_pages.get(next_token, Page(items=(), next_token=None))
+        return Page(items=tuple(self.buckets), next_token=None)
 
     def list_objects(
         self: Self,
@@ -195,16 +208,26 @@ def make_function(name: str, runtime: str = "python3.14") -> FunctionSummary:
 class FakeLambdaGateway:
     """In-memory stand-in for the real Lambda gateway."""
 
-    def __init__(self: Self, functions: list[FunctionSummary] | None = None, error: AwsError | None = None) -> None:
+    def __init__(
+        self: Self,
+        functions: list[FunctionSummary] | None = None,
+        error: AwsError | None = None,
+        pages: dict[str | None, Page[FunctionSummary]] | None = None,
+    ) -> None:
         self.functions = functions or []
         self.error = error
+        self.pages = pages
         self.calls = 0
+        self.next_tokens: list[str | None] = []
 
-    def list_functions(self: Self) -> list[FunctionSummary]:
+    def list_functions(self: Self, next_token: str | None = None) -> Page[FunctionSummary]:
         self.calls += 1
+        self.next_tokens.append(next_token)
         if self.error is not None:
             raise self.error
-        return list(self.functions)
+        if self.pages is not None:
+            return self.pages.get(next_token, Page(items=(), next_token=None))
+        return Page(items=tuple(self.functions), next_token=None)
 
 
 def make_queue(name: str) -> QueueSummary:
@@ -215,16 +238,26 @@ def make_queue(name: str) -> QueueSummary:
 class FakeSqsGateway:
     """In-memory stand-in for the real SQS gateway."""
 
-    def __init__(self: Self, queues: list[QueueSummary] | None = None, error: AwsError | None = None) -> None:
+    def __init__(
+        self: Self,
+        queues: list[QueueSummary] | None = None,
+        error: AwsError | None = None,
+        pages: dict[str | None, Page[QueueSummary]] | None = None,
+    ) -> None:
         self.queues = queues or []
         self.error = error
+        self.pages = pages
         self.calls = 0
+        self.next_tokens: list[str | None] = []
 
-    def list_queues(self: Self) -> list[QueueSummary]:
+    def list_queues(self: Self, next_token: str | None = None) -> Page[QueueSummary]:
         self.calls += 1
+        self.next_tokens.append(next_token)
         if self.error is not None:
             raise self.error
-        return list(self.queues)
+        if self.pages is not None:
+            return self.pages.get(next_token, Page(items=(), next_token=None))
+        return Page(items=tuple(self.queues), next_token=None)
 
 
 class FakeSsoLoginGateway:

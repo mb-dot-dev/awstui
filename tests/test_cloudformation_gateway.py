@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 import json
 
 import boto3
+from botocore.stub import Stubber
 from moto import mock_aws
 import pytest
 
@@ -41,14 +42,15 @@ def _create_detailed_stack() -> None:
 
 
 @mock_aws
-def test_list_stacks_returns_all_stacks_sorted_by_name() -> None:
+def test_list_stacks_returns_stacks_in_api_order_unsorted() -> None:
     client = boto3.client("cloudformation", region_name="eu-west-1")
     for name in ("gamma", "alpha", "beta"):
         client.create_stack(StackName=name, TemplateBody=TEMPLATE)
 
-    stacks = _gateway().list_stacks()
+    page = _gateway().list_stacks()
 
-    assert [stack.name for stack in stacks] == ["alpha", "beta", "gamma"]
+    assert [stack.name for stack in page.items] == ["gamma", "alpha", "beta"]
+    assert page.next_token is None
 
 
 @mock_aws
@@ -56,7 +58,7 @@ def test_list_stacks_maps_fields() -> None:
     client = boto3.client("cloudformation", region_name="eu-west-1")
     client.create_stack(StackName="alpha", TemplateBody=TEMPLATE)
 
-    stack = _gateway().list_stacks()[0]
+    stack = _gateway().list_stacks().items[0]
 
     assert stack.name == "alpha"
     assert stack.status == "CREATE_COMPLETE"
@@ -148,4 +150,30 @@ def test_delete_stack_deletes_the_stack() -> None:
 
     _gateway().delete_stack("alpha")
 
-    assert _gateway().list_stacks() == []
+    assert _gateway().list_stacks().items == ()
+
+
+def test_list_stacks_forwards_next_token() -> None:
+    client = boto3.client("cloudformation", region_name="eu-west-1")
+    created = datetime(2026, 1, 1, tzinfo=UTC)
+    with Stubber(client) as stubber:
+        stubber.add_response(
+            "describe_stacks",
+            {
+                "Stacks": [{"StackName": "alpha", "StackStatus": "CREATE_COMPLETE", "CreationTime": created}],
+                "NextToken": "t1",
+            },
+            {},
+        )
+        stubber.add_response(
+            "describe_stacks",
+            {"Stacks": [{"StackName": "beta", "StackStatus": "CREATE_COMPLETE", "CreationTime": created}]},
+            {"NextToken": "t1"},
+        )
+
+        first = CloudFormationGateway(client).list_stacks()
+        second = CloudFormationGateway(client).list_stacks(first.next_token)
+
+    assert first.next_token == "t1"
+    assert [stack.name for stack in second.items] == ["beta"]
+    assert second.next_token is None

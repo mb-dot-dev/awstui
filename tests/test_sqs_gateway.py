@@ -20,13 +20,14 @@ def _create_queue(name: str) -> None:
 
 
 @mock_aws
-def test_list_queues_returns_all_queues_sorted_by_name() -> None:
+def test_list_queues_returns_queues_in_api_order_unsorted() -> None:
     for name in ("gamma", "alpha", "beta"):
         _create_queue(name)
 
-    queues = _gateway().list_queues()
+    page = _gateway().list_queues()
 
-    assert [queue.name for queue in queues] == ["alpha", "beta", "gamma"]
+    assert [queue.name for queue in page.items] == ["gamma", "alpha", "beta"]
+    assert page.next_token is None
 
 
 @mock_aws
@@ -34,14 +35,36 @@ def test_list_queues_marks_fifo_queues() -> None:
     _create_queue("orders.fifo")
     _create_queue("orders")
 
-    queues = _gateway().list_queues()
+    queues = _gateway().list_queues().items
 
-    assert [(queue.name, queue.is_fifo) for queue in queues] == [("orders", False), ("orders.fifo", True)]
+    # moto's list_queues returns creation order, not alphabetical, and the gateway no longer
+    # sorts; this test only cares about correct FIFO detection, so compare order-independently.
+    assert {(queue.name, queue.is_fifo) for queue in queues} == {("orders", False), ("orders.fifo", True)}
 
 
 @mock_aws
 def test_list_queues_returns_empty_list_for_empty_region() -> None:
-    assert _gateway().list_queues() == []
+    assert _gateway().list_queues().items == ()
+
+
+def test_list_queues_forwards_next_token() -> None:
+    client = boto3.client("sqs", region_name="eu-west-1")
+    with Stubber(client) as stubber:
+        stubber.add_response(
+            "list_queues",
+            {"QueueUrls": ["https://sqs.eu-west-1.amazonaws.com/123456789012/alpha"], "NextToken": "t1"},
+            {},
+        )
+        stubber.add_response(
+            "list_queues", {"QueueUrls": ["https://sqs.eu-west-1.amazonaws.com/123456789012/beta"]}, {"NextToken": "t1"}
+        )
+
+        first = SqsGateway(client).list_queues()
+        second = SqsGateway(client).list_queues(first.next_token)
+
+    assert first.next_token == "t1"
+    assert [queue.name for queue in second.items] == ["beta"]
+    assert second.next_token is None
 
 
 def test_to_summary_takes_name_from_last_url_segment() -> None:

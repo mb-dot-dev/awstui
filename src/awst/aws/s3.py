@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Self
 from botocore.exceptions import BotoCoreError, ClientError
 
 from awst.aws.errors import map_botocore_error
-from awst.aws.models import AwsError, BucketSummary, ObjectPage, ObjectSummary
+from awst.aws.models import AwsError, BucketSummary, ObjectPage, ObjectSummary, Page
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -26,17 +26,20 @@ class S3Gateway:
         self._regional_client_factory = regional_client_factory
         self._regional_clients: dict[str, S3Client] = {}
 
-    def list_buckets(self: Self) -> list[BucketSummary]:
-        """Return every bucket in the account, sorted by name.
+    def list_buckets(self: Self, next_token: str | None = None) -> Page[BucketSummary]:
+        """Return one page of buckets in the account.
 
         Raises AwsError for any credential, network, or API failure.
         """
         try:
-            paginator = self._client.get_paginator("list_buckets")
-            buckets = [_to_summary(bucket) for page in paginator.paginate() for bucket in page["Buckets"]]
+            if next_token is None:
+                response = self._client.list_buckets()
+            else:
+                response = self._client.list_buckets(ContinuationToken=next_token)
         except (BotoCoreError, ClientError) as error:
             raise map_botocore_error(error) from error
-        return sorted(buckets, key=lambda bucket: bucket.name)
+        buckets = tuple(_to_summary(bucket) for bucket in response.get("Buckets", []))
+        return Page(items=buckets, next_token=response.get("ContinuationToken"))
 
     def list_objects(
         self: Self,

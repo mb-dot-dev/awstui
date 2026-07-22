@@ -6,6 +6,7 @@ import pytest
 
 from awst.aws.models import (
     AwsError,
+    Page,
     StackDetail,
     StackNotFoundError,
     StackSummary,
@@ -62,3 +63,17 @@ def test_stack_detail_is_immutable() -> None:
 
     with pytest.raises(AttributeError):
         detail.status = "DELETE_COMPLETE"  # type: ignore[misc]  # ty: ignore[invalid-assignment]
+
+
+def test_page_is_immutable() -> None:
+    page = Page(items=("a", "b"), next_token="t1")
+
+    with pytest.raises(AttributeError):
+        page.next_token = None  # type: ignore[misc]  # ty: ignore[invalid-assignment]
+
+
+def test_page_next_token_is_none_for_the_last_page() -> None:
+    page: Page[str] = Page(items=("a",), next_token=None)
+
+    assert page.items == ("a",)
+    assert page.next_token is None

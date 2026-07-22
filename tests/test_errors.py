@@ -61,7 +61,7 @@ def test_unknown_botocore_error_falls_back_to_str() -> None:
 
 
 class _ExplodingClient:
-    def get_paginator(self, _operation_name: str) -> NoReturn:
+    def describe_stacks(self, **_kwargs: object) -> NoReturn:
         raise NoCredentialsError
 
 

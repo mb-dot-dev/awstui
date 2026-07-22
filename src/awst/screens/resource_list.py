@@ -1,16 +1,18 @@
 """Shared base for read-only, filterable AWS resource list screens."""
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, ClassVar, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 from textual import work
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Input, Static
-from textual.worker import Worker, WorkerState
+from textual.worker import Worker, WorkerState, get_current_worker
 
 from awst.aws.models import AwsError, CredentialsError
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from rich.text import Text
     from textual.app import ComposeResult
     from textual.binding import BindingType
@@ -66,6 +68,14 @@ class ResourceListScreen[ItemT](Screen[None]):
         """Fetch the next page; called on a worker thread, only when _has_more() is true."""
         raise NotImplementedError
 
+    def _sort_key(self: Self) -> Callable[[ItemT], Any] | None:
+        """Key to keep _all_items sorted after every fetch; None (the default) means don't re-sort."""
+        return None
+
+    def _auto_fetch_on_filter(self: Self) -> bool:
+        """Whether a non-empty filter should trigger fetching every remaining page."""
+        return True
+
     def compose(self: Self) -> ComposeResult:
         yield Static(id="count")
         yield Input(placeholder=f"filter {self.NOUN}s by name", id="filter")
@@ -96,6 +106,15 @@ class ResourceListScreen[ItemT](Screen[None]):
     def _fetch_more(self: Self) -> list[ItemT]:
         return self._list_more()
 
+    @work(thread=True, exclusive=True, exit_on_error=False)
+    def _fetch_remaining(self: Self) -> list[ItemT]:
+        items: list[ItemT] = []
+        while self._has_more():
+            if get_current_worker().is_cancelled:
+                break
+            items.extend(self._list_more())
+        return items
+
     def action_load_more(self: Self) -> None:
         if not self._has_more() or self._loading_more:
             return
@@ -106,25 +125,11 @@ class ResourceListScreen[ItemT](Screen[None]):
         self._fetch_more()
 
     def on_worker_state_changed(self: Self, event: Worker.StateChanged) -> None:
-        if event.worker.name not in {"_fetch_items", "_fetch_more"}:
+        if event.worker.name not in {"_fetch_items", "_fetch_more", "_fetch_remaining"}:
             return
-        is_more = event.worker.name == "_fetch_more"
+        is_more = event.worker.name in {"_fetch_more", "_fetch_remaining"}
         if event.state == WorkerState.SUCCESS:
-            self._show_login = False
-            was_loaded = self._loaded
-            self._loaded = True
-            result = event.worker.result or []
-            if is_more:
-                self._all_items = [*self._all_items, *result]
-                self._loading_more = False
-            else:
-                self._all_items = result
-            self.refresh_bindings()
-            table = self.query_one("#items", DataTable)
-            table.loading = False
-            self._render_rows()
-            if not was_loaded:
-                table.focus()
+            self._on_fetch_success(is_more=is_more, result=event.worker.result or [])
         elif event.state == WorkerState.ERROR:
             if is_more:
                 self._loading_more = False
@@ -139,6 +144,26 @@ class ResourceListScreen[ItemT](Screen[None]):
             # flag now so the user can retry without waiting for the zombie thread to finish.
             self._loading_more = False
             self.refresh_bindings()
+
+    def _on_fetch_success(self: Self, *, is_more: bool, result: list[ItemT]) -> None:
+        self._show_login = False
+        was_loaded = self._loaded
+        self._loaded = True
+        if is_more:
+            self._all_items = [*self._all_items, *result]
+            self._loading_more = False
+        else:
+            self._all_items = result
+        key = self._sort_key()
+        if key is not None:
+            self._all_items = sorted(self._all_items, key=key)
+        self.refresh_bindings()
+        table = self.query_one("#items", DataTable)
+        table.loading = False
+        self._render_rows()
+        if not was_loaded:
+            table.focus()
+        self._maybe_fetch_remaining()
 
     def _show_error(self: Self, error: AwsError) -> None:
         self._show_login = isinstance(error, CredentialsError) and bool(getattr(self.app, "sso_login_possible", False))
@@ -191,6 +216,19 @@ class ResourceListScreen[ItemT](Screen[None]):
     def on_input_changed(self: Self, event: Input.Changed) -> None:
         if event.input.id == "filter":
             self._render_rows()
+            self._maybe_fetch_remaining()
+            # A fetch already in flight (started by an earlier keystroke) has _loading_more set but
+            # won't re-trigger above; re-show "searching…" so it doesn't flicker back to a stale count.
+            if self._loading_more:
+                self.query_one("#count", Static).update("searching…")
+
+    def _maybe_fetch_remaining(self: Self) -> None:
+        query = self.query_one("#filter", Input).value.strip()
+        if query and self._auto_fetch_on_filter() and self._has_more() and not self._loading_more:
+            self._loading_more = True
+            self.refresh_bindings()
+            self.query_one("#count", Static).update("searching…")
+            self._fetch_remaining()
 
     def action_focus_filter(self: Self) -> None:
         self.query_one("#filter", Input).focus()

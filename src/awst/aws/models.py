@@ -66,6 +66,14 @@ class SsoToken:
 
 
 @dataclass(frozen=True, slots=True)
+class Page[T]:
+    """One page of a paginated listing."""
+
+    items: tuple[T, ...]
+    next_token: str | None  # None when this is the last page
+
+
+@dataclass(frozen=True, slots=True)
 class BucketSummary:
     """An S3 bucket, reduced to what the UI needs."""
 
