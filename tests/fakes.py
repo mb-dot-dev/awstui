@@ -144,6 +144,7 @@ class FakeS3Gateway:
         self: Self,
         buckets: list[BucketSummary] | None = None,
         error: AwsError | None = None,
+        bucket_pages: dict[str | None, Page[BucketSummary]] | None = None,
         empty_batches: list[int] | None = None,
         empty_error: AwsError | None = None,
         empty_gate: threading.Event | None = None,
@@ -153,6 +154,7 @@ class FakeS3Gateway:
     ) -> None:
         self.buckets = buckets or []
         self.error = error
+        self.bucket_pages = bucket_pages
         self.empty_batches = empty_batches or []
         self.empty_error = empty_error
         self.empty_gate = empty_gate
@@ -161,13 +163,17 @@ class FakeS3Gateway:
         self.objects_gate = objects_gate
         self.object_calls: list[tuple[str, str, str, str | None]] = []
         self.calls = 0
+        self.next_tokens: list[str | None] = []
         self.emptied: list[str] = []
 
-    def list_buckets(self: Self) -> list[BucketSummary]:
+    def list_buckets(self: Self, next_token: str | None = None) -> Page[BucketSummary]:
         self.calls += 1
+        self.next_tokens.append(next_token)
         if self.error is not None:
             raise self.error
-        return list(self.buckets)
+        if self.bucket_pages is not None:
+            return self.bucket_pages.get(next_token, Page(items=(), next_token=None))
+        return Page(items=tuple(self.buckets), next_token=None)
 
     def list_objects(
         self: Self,

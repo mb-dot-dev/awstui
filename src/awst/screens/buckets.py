@@ -4,8 +4,9 @@ from functools import partial
 from typing import TYPE_CHECKING, ClassVar, Protocol, Self
 
 from textual.widgets import DataTable
+from textual.worker import get_current_worker
 
-from awst.aws.models import BucketSummary
+from awst.aws.models import BucketSummary, Page
 from awst.screens.confirm import ConfirmScreen
 from awst.screens.empty_bucket import BucketEmptier, EmptyBucketScreen
 from awst.screens.formatting import relative_age
@@ -13,6 +14,7 @@ from awst.screens.objects import ObjectLister, ObjectListScreen
 from awst.screens.resource_list import ResourceListScreen
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from datetime import datetime
 
     from textual.binding import BindingType
@@ -21,7 +23,7 @@ if TYPE_CHECKING:
 class BucketLister(Protocol):
     """The slice of the S3 gateway the list itself needs."""
 
-    def list_buckets(self: Self) -> list[BucketSummary]: ...
+    def list_buckets(self: Self, next_token: str | None = None) -> Page[BucketSummary]: ...
 
 
 class BucketGateway(BucketLister, BucketEmptier, ObjectLister, Protocol):
@@ -40,9 +42,25 @@ class BucketListScreen(ResourceListScreen[BucketSummary]):
     def __init__(self: Self, gateway: BucketGateway) -> None:
         super().__init__()
         self._gateway = gateway
+        self._next_token: str | None = None
 
     def _list(self: Self) -> list[BucketSummary]:
-        return self._gateway.list_buckets()
+        page = self._gateway.list_buckets()
+        if not get_current_worker().is_cancelled:
+            self._next_token = page.next_token
+        return list(page.items)
+
+    def _has_more(self: Self) -> bool:
+        return self._next_token is not None
+
+    def _list_more(self: Self) -> list[BucketSummary]:
+        page = self._gateway.list_buckets(self._next_token)
+        if not get_current_worker().is_cancelled:
+            self._next_token = page.next_token
+        return list(page.items)
+
+    def _sort_key(self: Self) -> Callable[[BucketSummary], str]:
+        return lambda bucket: bucket.name
 
     def _row(self: Self, item: BucketSummary, now: datetime) -> tuple[str, ...]:
         return (item.name, item.region, relative_age(item.created, now))

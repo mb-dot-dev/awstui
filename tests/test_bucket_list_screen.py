@@ -9,7 +9,7 @@ from textual.app import App
 from textual.widgets import DataTable, Input, Static
 from textual.worker import WorkerCancelled, WorkerFailed
 
-from awst.aws.models import AwsError
+from awst.aws.models import AwsError, Page
 from awst.screens.buckets import BucketListScreen
 from awst.screens.confirm import ConfirmScreen
 from awst.screens.empty_bucket import EmptyBucketScreen
@@ -335,3 +335,62 @@ async def test_confirming_empties_the_bucket_and_refreshes() -> None:
 
         assert gateway.emptied == ["assets"]
         assert gateway.calls == 2  # the list refreshed after emptying
+
+
+@pytest.mark.asyncio
+async def test_renders_rows_sorted_by_name_even_when_gateway_order_differs() -> None:
+    gateway = FakeS3Gateway(buckets=[make_bucket("prod-logs"), make_bucket("prod-assets")])
+    app = BucketScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+        table = app.screen.query_one(DataTable)
+
+        assert table.get_row_at(0)[0] == "prod-assets"
+        assert table.get_row_at(1)[0] == "prod-logs"
+
+
+@pytest.mark.asyncio
+async def test_m_appends_and_resorts_the_next_page() -> None:
+    first = Page(items=(make_bucket("prod-logs"),), next_token="t1")
+    second = Page(items=(make_bucket("prod-assets"),), next_token=None)
+    gateway = FakeS3Gateway(bucket_pages={None: first, "t1": second})
+    app = BucketScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+        assert str(app.screen.query_one("#count", Static).content) == "1+ bucket"
+
+        await pilot.press("m")
+        await _settle(app)
+        await pilot.pause()
+        table = app.screen.query_one(DataTable)
+
+        assert gateway.next_tokens == [None, "t1"]
+        assert table.row_count == 2
+        assert table.get_row_at(0)[0] == "prod-assets"
+        assert table.get_row_at(1)[0] == "prod-logs"
+
+
+@pytest.mark.asyncio
+async def test_filter_fetches_remaining_pages_to_find_matches_beyond_the_first_page() -> None:
+    first = Page(items=(make_bucket("prod-logs"),), next_token="t1")
+    second = Page(items=(make_bucket("prod-assets"),), next_token=None)
+    gateway = FakeS3Gateway(bucket_pages={None: first, "t1": second})
+    app = BucketScreenApp(gateway)
+
+    async with app.run_test() as pilot:
+        await _settle(app)
+        await pilot.pause()
+
+        await pilot.press("slash")
+        await pilot.press(*"assets")
+        await _settle(app)
+        await pilot.pause()
+        table = app.screen.query_one(DataTable)
+
+        assert gateway.next_tokens == [None, "t1"]
+        assert table.row_count == 1
+        assert table.get_row_at(0)[0] == "prod-assets"
